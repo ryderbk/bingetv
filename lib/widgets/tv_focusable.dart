@@ -11,7 +11,7 @@ class TvFocusable extends StatefulWidget {
     this.onSelected,
     this.onFocusChange,
     this.scaleOnFocus = true,
-    this.scaleValue = 1.08,
+    this.scaleValue = 1.06,
     this.borderRadius = 16,
     this.focusedBorderColor = bingeYellow,
     this.unfocusedBorderColor = bingeDeepPurple,
@@ -42,6 +42,7 @@ class TvFocusable extends StatefulWidget {
 
 class _TvFocusableState extends State<TvFocusable> {
   bool _isFocused = false;
+  bool _pressed = false;
 
   static final Map<ShortcutActivator, Intent> _tvShortcuts = {
     const SingleActivator(LogicalKeyboardKey.select): const ActivateIntent(),
@@ -65,51 +66,70 @@ class _TvFocusableState extends State<TvFocusable> {
             },
           ),
         },
-        child: FocusableActionDetector(
-          focusNode: widget.focusNode,
-          autofocus: widget.autofocus,
-          onFocusChange: (focused) {
-            setState(() => _isFocused = focused);
-            widget.onFocusChange?.call(focused);
+        child: Focus(
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.select ||
+                    event.logicalKey == LogicalKeyboardKey.enter ||
+                    event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                    event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
+              setState(() => _pressed = true);
+              Future<void>.delayed(const Duration(milliseconds: 90), () {
+                if (mounted) setState(() => _pressed = false);
+              });
+              widget.onSelected?.call();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
           },
-          mouseCursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: widget.onSelected,
-            child: AnimatedScale(
-              scale: (widget.scaleOnFocus && _isFocused)
-                  ? widget.scaleValue
-                  : 1.0,
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOutCubic,
-              child: AnimatedContainer(
+          child: FocusableActionDetector(
+            focusNode: widget.focusNode,
+            autofocus: widget.autofocus,
+            onFocusChange: (focused) {
+              setState(() => _isFocused = focused);
+              widget.onFocusChange?.call(focused);
+            },
+            mouseCursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: widget.onSelected,
+              child: AnimatedScale(
+                scale: _pressed
+                    ? 0.97
+                    : (widget.scaleOnFocus && _isFocused)
+                    ? widget.scaleValue
+                    : 1.0,
                 duration: const Duration(milliseconds: 150),
                 curve: Curves.easeOutCubic,
-                padding: widget.padding,
-                decoration: BoxDecoration(
-                  color: _isFocused
-                      ? (widget.focusedBackgroundColor ??
-                            widget.backgroundColor)
-                      : widget.backgroundColor,
-                  borderRadius: BorderRadius.circular(widget.borderRadius),
-                  border: Border.all(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOutCubic,
+                  padding: widget.padding,
+                  decoration: BoxDecoration(
                     color: _isFocused
-                        ? widget.focusedBorderColor
-                        : widget.unfocusedBorderColor,
-                    width: _isFocused
-                        ? widget.borderWidth + 1
-                        : widget.borderWidth,
+                        ? (widget.focusedBackgroundColor ??
+                              widget.backgroundColor)
+                        : widget.backgroundColor,
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                    border: Border.all(
+                      color: _isFocused
+                          ? widget.focusedBorderColor
+                          : widget.unfocusedBorderColor,
+                      width: _isFocused
+                          ? widget.borderWidth + 1
+                          : widget.borderWidth,
+                    ),
+                    boxShadow: _isFocused
+                        ? const [
+                            BoxShadow(
+                              color: Colors.black87,
+                              blurRadius: 24,
+                              offset: Offset(0, 8),
+                            ),
+                          ]
+                        : null,
                   ),
-                  boxShadow: _isFocused
-                      ? [
-                          BoxShadow(
-                            color: bingePurple.withValues(alpha: 0.8),
-                            blurRadius: 24,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                      : null,
+                  child: widget.builder(context, _isFocused),
                 ),
-                child: widget.builder(context, _isFocused),
               ),
             ),
           ),

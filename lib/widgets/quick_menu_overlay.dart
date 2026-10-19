@@ -50,6 +50,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
         SingleActivator(LogicalKeyboardKey.goBack): DismissIntent(),
+        SingleActivator(LogicalKeyboardKey.contextMenu): DismissIntent(),
       },
       child: Actions(
         actions: {

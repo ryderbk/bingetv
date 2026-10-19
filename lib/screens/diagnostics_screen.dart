@@ -111,6 +111,25 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                 ),
                 const SizedBox(width: 20),
                 TvFocusable(
+                  onSelected: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ColourCheckScreen(),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  builder: (_, focused) => Text(
+                    'Colour check',
+                    style: TextStyle(
+                      color: focused ? bingeYellow : Colors.white,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                TvFocusable(
                   onSelected: () => Navigator.of(context).pop(),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -125,6 +144,79 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ColourCheckScreen extends StatelessWidget {
+  const ColourCheckScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const colours = [
+      Colors.black,
+      Color(0xFF0E0B14),
+      Color(0xFF17122A),
+      bingeYellow,
+      bingePurple,
+    ];
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        minimum: const EdgeInsets.all(40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Colour check',
+              style: TextStyle(
+                color: bingeYellow,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                for (final colour in colours)
+                  Expanded(
+                    child: Container(
+                      height: 180,
+                      margin: const EdgeInsets.only(right: 12),
+                      color: colour,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < 32; i++)
+                    Expanded(
+                      child: ColoredBox(
+                        color: Color.fromARGB(255, i * 8, i * 8, i * 8),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            TvFocusable(
+              autofocus: true,
+              onSelected: () => Navigator.of(context).pop(),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              builder: (_, focused) => Text(
+                'Back',
+                style: TextStyle(
+                  color: focused ? bingeYellow : Colors.white,
+                  fontSize: 20,
+                ),
+              ),
             ),
           ],
         ),

@@ -34,6 +34,33 @@ such as `*doubleclick.net*` were passed as regular expressions.
 * Native interception can be disabled while Flutter overlays and routes are
   active, and long-press state is tracked per key code.
 
+## Follow-up UI and remote findings
+
+The later TV report identified four separate regressions in the first
+hardening pass:
+
+* F1/F3: screen-local channel handlers and hand-toggled interception could
+  swallow overlay activation and leave the WebView without a handler.
+* F2: the watchdog interpreted “progress is not 100%” as failure, which is
+  incorrect for pages with long-lived ad or analytics requests.
+* F4: selector focus nodes were recreated without disposing or preserving the
+  previous target.
+* F5: editor `TextFormField`s were mounted as ordinary traversal targets, so
+  the IME could open before OK.
+
+The current implementation uses [key_pipeline.dart](../lib/services/key_pipeline.dart)
+as the only channel owner, derives interception from `InputMode`, sends a
+heartbeat while interception is active, and fails closed in Kotlin after 2.5
+seconds without a heartbeat. `WebLoadTracker` treats progress of 30 or more
+as committed; only a page with no commitment after 20 seconds can produce a
+blocking timeout. Editor values are represented by [TvTextField](../lib/widgets/tv_text_field.dart)
+rows and enter a real text field only after OK.
+
+The automated evidence is `flutter analyze` with zero issues, the complete
+Flutter test suite, and the `key_pipeline_test.dart` and
+`load_state_test.dart` regression tests. ADB key sequences, screenshots and
+real Fire OS color/rendering behavior remain physical-device checks.
+
 ## Runtime evidence still requiring a device
 
 The repository does not contain an Android TV AVD snapshot or logcat capture,

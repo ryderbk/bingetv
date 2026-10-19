@@ -18,6 +18,7 @@ class MainActivity : FlutterActivity() {
     private var methodChannel: MethodChannel? = null
     private var webScreenActive = false
     private var nativeInterceptEnabled = false
+    private var lastInterceptHeartbeat = 0L
     private var remoteTestActive = false
 
     // Long press tracking for remote keys (especially DPAD_CENTER / OK)
@@ -79,6 +80,13 @@ class MainActivity : FlutterActivity() {
                     }
                     "setNativeInterceptEnabled" -> {
                         nativeInterceptEnabled = call.argument<Boolean>("enabled") ?: false
+                        if (nativeInterceptEnabled) {
+                            lastInterceptHeartbeat = System.currentTimeMillis()
+                        }
+                        result.success(true)
+                    }
+                    "nativeInterceptHeartbeat" -> {
+                        lastInterceptHeartbeat = System.currentTimeMillis()
                         result.success(true)
                     }
                     "setRemoteTestActive" -> {
@@ -141,7 +149,8 @@ class MainActivity : FlutterActivity() {
         }
 
         // If web screen is active, intercept remote keys to prevent WebView / OS eating them
-        if (webScreenActive && nativeInterceptEnabled) {
+        val heartbeatFresh = System.currentTimeMillis() - lastInterceptHeartbeat < 2500L
+        if (webScreenActive && nativeInterceptEnabled && heartbeatFresh) {
             val actionName = remoteKeyMap[keyCode]
             if (actionName != null) {
                 if (isDown) {
@@ -195,5 +204,16 @@ class MainActivity : FlutterActivity() {
         runOnUiThread {
             methodChannel?.invokeMethod("onRemoteKey", payload)
         }
+    }
+
+    override fun onPause() {
+        nativeInterceptEnabled = false
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        nativeInterceptEnabled = false
+        methodChannel = null
+        super.onDestroy()
     }
 }

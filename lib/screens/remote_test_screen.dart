@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../theme.dart';
+import '../services/key_pipeline.dart';
 import '../widgets/tv_focusable.dart';
 
 class RemoteTestScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class RemoteTestScreen extends StatefulWidget {
 }
 
 class _RemoteTestScreenState extends State<RemoteTestScreen> {
-  static const _channel = MethodChannel('com.binge.app/key_pipeline');
+  final _keyPipeline = KeyPipeline.instance;
 
   final List<Map<String, dynamic>> _events = [];
   final Set<int> _receivedKeyCodes = {};
@@ -45,21 +46,20 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
   @override
   void initState() {
     super.initState();
-    _channel.setMethodCallHandler(_handleNativeCall);
-    _channel.invokeMethod('setRemoteTestActive', {'active': true});
+    _keyPipeline.addListener(_handleNativeEvent);
+    _keyPipeline.setMode(InputMode.remoteTest);
     _loadDiagnostics();
   }
 
   @override
   void dispose() {
-    _channel.invokeMethod('setRemoteTestActive', {'active': false});
-    _channel.setMethodCallHandler(null);
+    _keyPipeline.removeListener(_handleNativeEvent);
+    _keyPipeline.setMode(InputMode.webPage);
     super.dispose();
   }
 
-  Future<void> _handleNativeCall(MethodCall call) async {
-    if (call.method == 'onTestKeyEvent') {
-      final map = Map<String, dynamic>.from(call.arguments as Map);
+  void _handleNativeEvent(Map<String, dynamic> map) {
+    if (map.containsKey('keyCode')) {
       final code = (map['keyCode'] as num?)?.toInt() ?? 0;
       if (mounted) {
         setState(() {

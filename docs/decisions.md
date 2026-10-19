@@ -11,3 +11,16 @@
   return to sites or enter safe mode from a themed error surface.
 * Keep Android key interception opt-in. Flutter owns focus whenever an overlay
   or pushed route is visible.
+* Treat a page as committed once meaningful progress is reported. Never cover
+  a committed page with a timeout screen merely because ad requests prevent
+  100% completion.
+* Text editing is an explicit mode transition: a read-only focus row is
+  traversable, while the IME-backed `TextField` exists only after OK.
+
+## Colour check
+
+The app's surfaces now use #050308, #0E0B14 and #17122A with hairline borders
+instead of large purple glows. A real-TV screenshot comparison is still
+required to determine whether any remaining lift is caused by Fire OS picture
+mode or Flutter rendering. Use Movie/Filmmaker picture mode when checking true
+black before changing renderer settings.

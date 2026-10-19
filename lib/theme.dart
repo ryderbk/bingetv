@@ -3,17 +3,23 @@ import 'package:flutter/material.dart';
 const bingeYellow = Color(0xFFFFD600);
 const bingePurple = Color(0xFF7C3AED);
 const bingeDeepPurple = Color(0xFF4C1D95);
-const bingeDarkBg = Color(0xFF0D0A12);
-const bingeFieldBg = Color(0xFF16121F);
+const bingeBackground = Color(0xFF050308);
+const bingeSurface = Color(0xFF0E0B14);
+const bingeRaised = Color(0xFF17122A);
+const bingeTextSecondary = Color(0xFFB8B3C9);
+const bingeTextTertiary = Color(0xFF7C7790);
+const bingeDanger = Color(0xFFFF5C6C);
+const bingeDarkBg = bingeSurface;
+const bingeFieldBg = bingeRaised;
 
 ThemeData buildBingeTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: bingeBackground,
     colorScheme: const ColorScheme.dark(
       primary: bingeYellow,
       secondary: bingePurple,
-      surface: Colors.black,
+      surface: bingeBackground,
     ),
     textTheme: base.textTheme.apply(
       bodyColor: Colors.white,

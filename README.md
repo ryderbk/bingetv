@@ -79,3 +79,7 @@ adb pull /sdcard/Android/data/com.binge.app/files/diagnostics.txt
 See [docs/DEVICE_TEST.md](docs/DEVICE_TEST.md) for the physical Xiaomi TV
 checklist and [docs/diagnosis.md](docs/diagnosis.md) for the startup-hang
 analysis.
+
+If near-black surfaces look lifted on the TV, first select Movie or Filmmaker
+picture mode and disable dynamic contrast. Fire OS picture processing can
+change perceived blacks independently of Flutter.

@@ -41,6 +41,12 @@ Press each key on **Quick Menu > Remote Test** and fill in the result.
 - [ ] Pause/resume the app with Home and confirm lifecycle recovery.
 - [ ] Open Diagnostics and verify WebView package, UA, URL, key pipeline and
   blocker counts.
+- [ ] Confirm 100 random D-pad presses never lose the focus ring.
+- [ ] Confirm moving across every editor row never opens the keyboard; OK does.
+- [ ] Return from Remote Test and Diagnostics and confirm the WebView still
+  responds to the remote.
+- [ ] Compare Colour check swatches in Movie/Filmmaker picture mode.
+- [ ] Re-test INFO, GUIDE and BACK explicitly.
 - [ ] Select **Copy report**, then run:
 
   ```powershell

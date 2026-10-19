@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/tv_focusable.dart';
 import 'remote_test_screen.dart';
 import 'web_screen.dart';
+import '../widgets/tv_text_field.dart';
 
 class SelectorScreen extends StatefulWidget {
   const SelectorScreen({super.key});
@@ -57,10 +58,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
 
     if (!mounted) return;
 
-    _cardFocusNodes.clear();
-    for (var i = 0; i < sites.length; i++) {
-      _cardFocusNodes.add(FocusNode());
-    }
+    _syncCardFocusNodes(sites);
 
     setState(() {
       _sites = sites;
@@ -80,6 +78,25 @@ class _SelectorScreenState extends State<SelectorScreen> {
     }
 
     _restoreInitialFocus();
+  }
+
+  void _syncCardFocusNodes(List<Site> sites) {
+    final oldById = <String, FocusNode>{
+      for (var i = 0; i < _sites.length; i++) _sites[i].id: _cardFocusNodes[i],
+    };
+    for (final site in _sites) {
+      if (!sites.any((candidate) => candidate.id == site.id)) {
+        oldById[site.id]?.dispose();
+      }
+    }
+    _cardFocusNodes
+      ..clear()
+      ..addAll(
+        sites.map(
+          (site) =>
+              oldById[site.id] ?? FocusNode(debugLabel: 'site-${site.id}'),
+        ),
+      );
   }
 
   Future<List<dynamic>> _loadPreferencesWithTimeout() {
@@ -162,10 +179,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
       sites = await _store.load().timeout(const Duration(seconds: 3));
     } catch (_) {}
     if (mounted) {
-      _cardFocusNodes.clear();
-      for (var i = 0; i < sites.length; i++) {
-        _cardFocusNodes.add(FocusNode());
-      }
+      _syncCardFocusNodes(sites);
       setState(() {
         _sites = sites;
       });
@@ -177,7 +191,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: bingeBackground,
         body: Center(child: CircularProgressIndicator(color: bingeYellow)),
       );
     }
@@ -209,7 +223,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
               const Text(
                 'Choose a site',
                 style: TextStyle(
-                  color: bingePurple,
+                  color: bingeTextSecondary,
                   fontSize: 24,
                   fontWeight: FontWeight.w500,
                 ),
@@ -234,39 +248,35 @@ class _SelectorScreenState extends State<SelectorScreen> {
                         ),
                         if (i < _sites.length - 1) const SizedBox(width: 32),
                       ],
+                      const SizedBox(width: 32),
+                      TvFocusable(
+                        focusNode: _editButtonFocusNode,
+                        onSelected: _openEditor,
+                        borderRadius: 22,
+                        padding: const EdgeInsets.all(22),
+                        backgroundColor: bingeSurface,
+                        builder: (ctx, focused) => const SizedBox(
+                          width: 276,
+                          height: 176,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.edit, color: bingeYellow, size: 46),
+                              SizedBox(height: 14),
+                              Text(
+                                'Edit links',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Edit links button
-              TvFocusable(
-                focusNode: _editButtonFocusNode,
-                onSelected: _openEditor,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 36,
-                  vertical: 14,
-                ),
-                builder: (ctx, focused) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.edit,
-                      color: focused ? bingeYellow : bingePurple,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Edit links',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: focused ? bingeYellow : Colors.white,
-                      ),
-                    ),
-                  ],
                 ),
               ),
 
@@ -322,8 +332,6 @@ class _SiteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final faviconUrl = 'https://${site.host}/favicon.ico';
-
     return TvFocusable(
       focusNode: focusNode,
       onSelected: onSelected,
@@ -352,16 +360,6 @@ class _SiteCard extends StatelessWidget {
                           color: bingeYellow,
                           fontWeight: FontWeight.bold,
                         ),
-                      ),
-                    ),
-                    ClipOval(
-                      child: Image.network(
-                        faviconUrl,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const SizedBox.shrink(),
                       ),
                     ),
                   ],
@@ -488,7 +486,12 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    for (var i = 0; i < _names.length; i++) {
+      if (_names[i].text.trim().isEmpty ||
+          _validateUrl(_urls[i].text) != null) {
+        return;
+      }
+    }
 
     final updated = <Site>[];
     for (var i = 0; i < _names.length; i++) {
@@ -555,7 +558,11 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
           minimum: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
           child: Form(
             key: _formKey,
-            onChanged: () => _hasUnsavedChanges = true,
+            onChanged: () {
+              if (!_hasUnsavedChanges) {
+                setState(() => _hasUnsavedChanges = true);
+              }
+            },
             child: ListView(
               children: [
                 Row(
@@ -606,6 +613,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                 // Site rows
                 for (var i = 0; i < _names.length; i++) ...[
                   Row(
+                    key: ValueKey('site-row-$i'),
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
@@ -644,23 +652,31 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  TextFormField(
+                  TvTextField(
+                    key: ValueKey('site-name-$i'),
+                    label: 'Name',
                     controller: _names[i],
-                    decoration: const InputDecoration(labelText: 'Name'),
+                    onChanged: () {
+                      if (!_hasUnsavedChanges) {
+                        setState(() => _hasUnsavedChanges = true);
+                      }
+                    },
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Name is required'
                         : null,
-                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  TvTextField(
+                    key: ValueKey('site-url-$i'),
+                    label: 'URL',
                     controller: _urls[i],
-                    decoration: const InputDecoration(
-                      labelText: 'URL (e.g. bingebang.st, httpbin.org)',
-                    ),
-                    validator: _validateUrl,
+                    onChanged: () {
+                      if (!_hasUnsavedChanges) {
+                        setState(() => _hasUnsavedChanges = true);
+                      }
+                    },
                     keyboardType: TextInputType.url,
-                    textInputAction: TextInputAction.next,
+                    validator: _validateUrl,
                   ),
                   const SizedBox(height: 24),
                 ],

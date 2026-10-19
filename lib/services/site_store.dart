@@ -10,6 +10,7 @@ class Site {
   final int pageWidth;
 
   String get host => Uri.tryParse(url)?.host ?? url;
+  String get id => url;
   String get initial =>
       name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 

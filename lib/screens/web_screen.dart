@@ -7,6 +7,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../services/site_store.dart';
 import '../services/redirect_policy.dart';
+import '../services/key_pipeline.dart';
+import '../services/load_state.dart';
 import '../theme.dart';
 import '../widgets/quick_menu_overlay.dart';
 import '../widgets/tv_focusable.dart';
@@ -22,14 +24,14 @@ class WebScreen extends StatefulWidget {
 }
 
 class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
-  static const _keyChannel = MethodChannel('com.binge.app/key_pipeline');
+  final _keyPipeline = KeyPipeline.instance;
   final _store = SiteStore();
 
   InAppWebViewController? _controller;
   bool _loading = true;
+  bool _slowNotice = false;
   int _progress = 0;
-  bool _pageCommitted = false;
-  DateTime _loadStartedAt = DateTime.now();
+  final _loadTracker = WebLoadTracker();
   Timer? _watchdogTimer;
   String? _error;
   int _blockedRequestCount = 0;
@@ -61,13 +63,23 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
     _currentPageWidth = widget.site.pageWidth;
     _setupNativeKeyPipeline();
     _watchdogTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_loading) return;
-      final elapsed = DateTime.now().difference(_loadStartedAt);
-      if (elapsed >= const Duration(seconds: 12)) {
+      if (!mounted || !_loading) {
+        return;
+      }
+      final now = DateTime.now();
+      if (_loadTracker.state != WebLoadState.connecting &&
+          now.difference(_loadTracker.lastProgress) >=
+              const Duration(seconds: 25)) {
         setState(() {
           _loading = false;
-          _error ??= 'The page did not make progress for 12 seconds.';
+          _slowNotice = true;
         });
+      } else if (_loadTracker.shouldShowBlockingTimeout(now)) {
+        setState(() {
+          _loading = false;
+          _error ??= 'The page did not commit within 20 seconds.';
+        });
+        _keyPipeline.setMode(InputMode.webOverlay);
         _overlayFocusNode.requestFocus();
       }
     });
@@ -77,7 +89,8 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _keyChannel.invokeMethod('setWebScreenActive', {'active': false});
+    _keyPipeline.removeListener(_handlePipelineEvent);
+    _keyPipeline.deactivateWebScreen();
     _overlayFocusNode.dispose();
     _watchdogTimer?.cancel();
     WakelockPlus.disable();
@@ -100,11 +113,11 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _setupNativeKeyPipeline() async {
-    _keyChannel.setMethodCallHandler(_handleNativeKeyCall);
-    await _keyChannel.invokeMethod('setWebScreenActive', {'active': true});
-    await _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-      'enabled': true,
-    });
+    _keyPipeline.addListener(_handlePipelineEvent);
+    await MethodChannel(
+      'com.binge.app/key_pipeline',
+    ).invokeMethod('setWebScreenActive', {'active': true});
+    await _keyPipeline.setMode(InputMode.webPage);
   }
 
   Future<void> _initEngineAndSettings() async {
@@ -154,9 +167,8 @@ $scriptContent
     }
   }
 
-  Future<void> _handleNativeKeyCall(MethodCall call) async {
-    if (call.method == 'onRemoteKey') {
-      final map = Map<String, dynamic>.from(call.arguments as Map);
+  void _handlePipelineEvent(Map<String, dynamic> map) {
+    if (map.containsKey('action')) {
       final action = map['action'] as String? ?? '';
       final repeat = (map['repeat'] as num?)?.toInt() ?? 0;
       final isLongPress = map['isLongPress'] as bool? ?? false;
@@ -171,9 +183,10 @@ $scriptContent
       setState(() {
         _isQuickMenuOpen = !_isQuickMenuOpen;
       });
-      _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-        'enabled': !_isQuickMenuOpen,
-      });
+      _keyPipeline.setMode(InputMode.webOverlay);
+      _keyPipeline.setMode(
+        _isQuickMenuOpen ? InputMode.webOverlay : InputMode.webPage,
+      );
       if (_isQuickMenuOpen) {
         _overlayFocusNode.requestFocus();
       }
@@ -183,9 +196,7 @@ $scriptContent
     if (_isQuickMenuOpen) {
       if (action == 'Back') {
         setState(() => _isQuickMenuOpen = false);
-        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-          'enabled': true,
-        });
+        _keyPipeline.setMode(InputMode.webPage);
       }
       return;
     }
@@ -211,6 +222,7 @@ $scriptContent
 
     // 4. Overlays active (Error or Offline)
     if (_error != null || _isOffline) {
+      _keyPipeline.setMode(InputMode.webOverlay);
       if (action == 'Back') {
         Navigator.of(context).pop();
       }
@@ -322,20 +334,21 @@ $scriptContent
                 _store.setLastOpenedSite(widget.site.url);
               },
               onLoadStart: (_, uri) {
-                _loadStartedAt = DateTime.now();
-                _pageCommitted = false;
+                _loadTracker.started();
                 setState(() {
                   _loading = true;
                   _progress = 0;
+                  _slowNotice = false;
                   _error = null;
                   _isOffline = false;
                 });
+                _keyPipeline.setMode(InputMode.webOverlay);
               },
               onProgressChanged: (_, progress) {
                 if (!mounted) return;
                 setState(() {
                   _progress = progress;
-                  if (progress >= 50) _pageCommitted = true;
+                  _loadTracker.progress(progress);
                   if (progress >= 100) _loading = false;
                 });
               },
@@ -356,7 +369,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                 if (mounted) {
                   setState(() {
                     _loading = false;
-                    _pageCommitted = true;
+                    _loadTracker.interactive();
                     _progress = 100;
                   });
                 }
@@ -426,8 +439,10 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                   targetUrl: uri,
                   isRedirect: navigationAction.isRedirect ?? false,
                   hasGesture: navigationAction.hasGesture ?? false,
-                  timeSinceLoad: DateTime.now().difference(_loadStartedAt),
-                  pageCommitted: _pageCommitted,
+                  timeSinceLoad: DateTime.now().difference(
+                    _loadTracker.lastProgress,
+                  ),
+                  pageCommitted: _loadTracker.state != WebLoadState.connecting,
                 );
                 if (decision == RedirectDecision.block) {
                   if (mounted) {
@@ -478,6 +493,27 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                   valueColor: const AlwaysStoppedAnimation(bingeYellow),
                 ),
               ),
+            if (_slowNotice && _error == null)
+              Positioned(
+                top: 12,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(color: Color(0xFF17122A)),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'Page is still loading - press Menu for options',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
             // Error & Offline Overlay (Defect 2 & Defect 3)
             if (_error != null) _buildThemedErrorOverlay(),
@@ -487,12 +523,11 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
               QuickMenuOverlay(
                 onResume: () {
                   setState(() => _isQuickMenuOpen = false);
-                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-                    'enabled': true,
-                  });
+                  _keyPipeline.setMode(InputMode.webPage);
                 },
                 onReload: () {
                   setState(() => _isQuickMenuOpen = false);
+                  _keyPipeline.setMode(InputMode.webPage);
                   _controller?.reload();
                 },
                 onHome: () => Navigator.of(context).pop(),
@@ -536,9 +571,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                 },
                 onOpenRemoteTest: () {
                   setState(() => _isQuickMenuOpen = false);
-                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-                    'enabled': false,
-                  });
+                  _keyPipeline.setMode(InputMode.remoteTest);
                   Navigator.of(context)
                       .push(
                         MaterialPageRoute(
@@ -546,16 +579,12 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                         ),
                       )
                       .whenComplete(() {
-                        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-                          'enabled': true,
-                        });
+                        _keyPipeline.setMode(InputMode.webPage);
                       });
                 },
                 onOpenDiagnostics: () {
                   setState(() => _isQuickMenuOpen = false);
-                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-                    'enabled': false,
-                  });
+                  _keyPipeline.setMode(InputMode.diagnostics);
                   Navigator.of(context)
                       .push(
                         MaterialPageRoute(
@@ -568,9 +597,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                         ),
                       )
                       .whenComplete(() {
-                        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
-                          'enabled': true,
-                        });
+                        _keyPipeline.setMode(InputMode.webPage);
                       });
                 },
                 webViewVersion: _webViewVersion,
