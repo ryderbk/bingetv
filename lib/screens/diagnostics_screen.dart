@@ -72,9 +72,12 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: bingeBackground,
       body: SafeArea(
-        minimum: const EdgeInsets.all(40),
+        minimum: const EdgeInsets.symmetric(
+          horizontal: bingePagePadding,
+          vertical: 36,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -82,16 +85,32 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               'Diagnostics',
               style: TextStyle(
                 color: bingeYellow,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 18),
-            Text(
-              _report.isEmpty ? 'Loading...' : _report,
-              style: const TextStyle(color: Colors.white70, fontSize: 18),
+            const SizedBox(height: 20),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: bingeSurface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _report.isEmpty ? 'Loading...' : _report,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 18,
+                      height: 1.55,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
             Row(
               children: [
                 TvFocusable(

@@ -104,9 +104,12 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
           ),
         },
         child: Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: bingeBackground,
           body: SafeArea(
-            minimum: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            minimum: const EdgeInsets.symmetric(
+              horizontal: bingePagePadding,
+              vertical: 32,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -120,13 +123,13 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                           'Remote Key Diagnostics',
                           style: TextStyle(
                             color: bingeYellow,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
                           'Xiaomi XMRM-P5 Remote Verification (Fire OS 8 / Android 11)',
-                          style: TextStyle(color: bingePurple, fontSize: 18),
+                          style: TextStyle(color: bingeTextSecondary, fontSize: 16),
                         ),
                       ],
                     ),
@@ -149,11 +152,10 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
-                    color: bingeDarkBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: bingeDeepPurple),
+                    color: bingeSurface,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
@@ -175,11 +177,11 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Observed Keys on Fire TV:',
+                  'Remote buttons',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -198,12 +200,10 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: isReceived
-                            ? bingePurple
-                            : const Color(0xFF1E1B29),
+                        color: isReceived ? const Color(0xFF3A2E12) : bingeSurface,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isReceived ? bingeYellow : Colors.white24,
+                          color: isReceived ? bingeYellow : bingeDivider,
                           width: isReceived ? 2 : 1,
                         ),
                       ),

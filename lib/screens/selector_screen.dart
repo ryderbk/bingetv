@@ -206,26 +206,41 @@ class _SelectorScreenState extends State<SelectorScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          minimum: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          minimum: const EdgeInsets.symmetric(
+            horizontal: bingePagePadding,
+            vertical: 36,
+          ),
           child: Column(
             children: [
-              const SizedBox(height: 8),
-              const Text(
-                'Binge',
-                style: TextStyle(
-                  color: bingeYellow,
-                  fontSize: 54,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Binge',
+                  style: TextStyle(
+                    color: bingeYellow,
+                    fontSize: 48,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1,
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Choose a site',
-                style: TextStyle(
-                  color: bingeTextSecondary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w500,
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Choose a site',
+                  style: TextStyle(
+                    color: bingeTextSecondary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 56,
+                  child: Divider(color: bingeYellow, thickness: 3),
                 ),
               ),
               const Spacer(),
@@ -246,29 +261,41 @@ class _SelectorScreenState extends State<SelectorScreen> {
                           onSelected: () => _openSite(_sites[i]),
                           isLastOpened: _sites[i].url == _lastOpenedUrl,
                         ),
-                        if (i < _sites.length - 1) const SizedBox(width: 32),
+                        if (i < _sites.length - 1) const SizedBox(width: 24),
                       ],
-                      const SizedBox(width: 32),
+                      const SizedBox(width: 24),
                       TvFocusable(
                         focusNode: _editButtonFocusNode,
                         onSelected: _openEditor,
-                        borderRadius: 22,
-                        padding: const EdgeInsets.all(22),
+                        borderRadius: 14,
+                        padding: EdgeInsets.zero,
                         backgroundColor: bingeSurface,
-                        builder: (ctx, focused) => const SizedBox(
-                          width: 276,
-                          height: 176,
+                        builder: (ctx, focused) => SizedBox(
+                          width: bingeCardWidth,
+                          height: bingeCardHeight,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.edit, color: bingeYellow, size: 46),
-                              SizedBox(height: 14),
+                              Icon(
+                                Icons.tune_rounded,
+                                color: focused ? bingeYellow : bingePurple,
+                                size: 38,
+                              ),
+                              const SizedBox(height: 18),
                               Text(
                                 'Edit links',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 23,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Manage your sites',
+                                style: TextStyle(
+                                  color: bingeTextSecondary,
+                                  fontSize: 15,
                                 ),
                               ),
                             ],
@@ -292,12 +319,9 @@ class _SelectorScreenState extends State<SelectorScreen> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF14101E),
+                    color: bingeSurface,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: bingeDeepPurple.withValues(alpha: 0.5),
                     ),
-                  ),
                   child: const Text(
                     'OK select  ·  Menu options  ·  Back exit',
                     style: TextStyle(
@@ -335,15 +359,16 @@ class _SiteCard extends StatelessWidget {
     return TvFocusable(
       focusNode: focusNode,
       onSelected: onSelected,
-      borderRadius: 22,
+      borderRadius: 14,
       scaleOnFocus: true,
-      scaleValue: 1.08,
+      scaleValue: 1.02,
+      backgroundColor: bingeSurface,
       builder: (ctx, focused) {
         return SizedBox(
-          width: 320,
-          height: 220,
+          width: bingeCardWidth,
+          height: bingeCardHeight,
           child: Padding(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -351,12 +376,12 @@ class _SiteCard extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     CircleAvatar(
-                      radius: 34,
-                      backgroundColor: bingeDeepPurple,
+                      radius: 32,
+                      backgroundColor: const Color(0xFF29212F),
                       child: Text(
                         site.initial,
                         style: const TextStyle(
-                          fontSize: 34,
+                          fontSize: 30,
                           color: bingeYellow,
                           fontWeight: FontWeight.bold,
                         ),
@@ -364,12 +389,12 @@ class _SiteCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Text(
                   site.name,
                   style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w700,
                     color: focused ? bingeYellow : Colors.white,
                   ),
                   maxLines: 1,
@@ -378,7 +403,7 @@ class _SiteCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   site.host,
-                  style: const TextStyle(fontSize: 18, color: Colors.white70),
+                  style: const TextStyle(fontSize: 15, color: bingeTextSecondary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -555,7 +580,10 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
-          minimum: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+          minimum: const EdgeInsets.symmetric(
+            horizontal: bingePagePadding,
+            vertical: 32,
+          ),
           child: Form(
             key: _formKey,
             onChanged: () {
@@ -572,8 +600,8 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                       'Edit links',
                       style: TextStyle(
                         color: bingeYellow,
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     TvFocusable(
@@ -608,7 +636,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // Site rows
                 for (var i = 0; i < _names.length; i++) ...[
@@ -616,13 +644,26 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     key: ValueKey('site-row-$i'),
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        'Site ${i + 1}',
-                        style: const TextStyle(
-                          color: bingePurple,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: bingeYellow,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Site ${i + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                       const Spacer(),
                       TvFocusable(
@@ -640,7 +681,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Delete',
+                              'Remove',
                               style: TextStyle(
                                 color: focused ? bingeYellow : Colors.redAccent,
                                 fontSize: 14,
@@ -678,7 +719,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     keyboardType: TextInputType.url,
                     validator: _validateUrl,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
 
                 // Add Site button
@@ -711,7 +752,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                 ),
 
                 const SizedBox(height: 24),
-                const Divider(color: Colors.white24),
+                const Divider(color: bingeDivider),
                 const SizedBox(height: 12),
 
                 // Preference: Open last site on start
@@ -722,21 +763,22 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                       _hasUnsavedChanges = true;
                     });
                   },
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  backgroundColor: bingeSurface,
+                  borderRadius: 12,
                   builder: (ctx, focused) => Row(
                     children: [
                       Icon(
                         _openLastOnStart
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank,
-                        color: focused ? bingeYellow : bingePurple,
-                        size: 26,
+                            ? Icons.toggle_on_rounded
+                            : Icons.toggle_off_rounded,
+                        color: focused || _openLastOnStart
+                            ? bingeYellow
+                            : bingeTextTertiary,
+                        size: 36,
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -749,7 +791,9 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                               ),
                             ),
                             Text(
-                              'Automatically launches directly into the last visited site upon launch',
+                              _openLastOnStart
+                                  ? 'Enabled · resumes your most recent site'
+                                  : 'Disabled · show the site selector on launch',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white60,

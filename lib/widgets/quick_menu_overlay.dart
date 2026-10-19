@@ -62,23 +62,16 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
           ),
         },
         child: Container(
-          color: Colors.black.withValues(alpha: 0.85),
+          color: Colors.black.withValues(alpha: 0.72),
           alignment: Alignment.centerRight,
           child: Container(
             width: 440,
             height: double.infinity,
             decoration: BoxDecoration(
-              color: const Color(0xFF0D0A14),
+              color: bingeSurface,
               border: const Border(
-                left: BorderSide(color: bingeDeepPurple, width: 3),
+                left: BorderSide(color: bingeDivider, width: 1),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: bingePurple.withValues(alpha: 0.5),
-                  blurRadius: 32,
-                  spreadRadius: 4,
-                ),
-              ],
             ),
             child: SafeArea(
               child: ListView(
@@ -98,7 +91,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                   const SizedBox(height: 6),
                   const Text(
                     'Press Back to resume',
-                    style: TextStyle(color: bingePurple, fontSize: 16),
+                    style: TextStyle(                    color: bingeTextSecondary, fontSize: 16),
                   ),
                   const SizedBox(height: 24),
 
@@ -108,7 +101,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                       decoration: BoxDecoration(
                         color: Colors.amber.shade900.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: bingeYellow),
+                        border: Border.all(color: bingeYellow, width: 1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,9 +251,9 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF14101E),
+                      color: bingeBackground,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
+                      border: Border.all(color: bingeDivider),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

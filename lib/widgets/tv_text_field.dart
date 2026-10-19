@@ -118,13 +118,13 @@ class _TvTextFieldState extends State<TvTextField> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: focused ? const Color(0xFF17122A) : const Color(0xFF0E0B14),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: focused ? bingeYellow : Colors.white12,
-            width: focused ? 3 : 1,
+            color: focused ? bingeYellow : bingeDivider,
+            width: focused ? 2 : 1,
           ),
         ),
         child: Row(
@@ -135,12 +135,12 @@ class _TvTextFieldState extends State<TvTextField> {
                 children: [
                   Text(
                     widget.label,
-                    style: const TextStyle(color: Colors.white60, fontSize: 18),
+                    style: const TextStyle(color: Colors.white54, fontSize: 15),
                   ),
                   const SizedBox(height: 5),
                   Text(
                     widget.controller.text,
-                    style: const TextStyle(color: Colors.white, fontSize: 24),
+                    style: const TextStyle(color: Colors.white, fontSize: 21),
                   ),
                   if (_error != null)
                     Text(

@@ -11,11 +11,11 @@ class TvFocusable extends StatefulWidget {
     this.onSelected,
     this.onFocusChange,
     this.scaleOnFocus = true,
-    this.scaleValue = 1.06,
-    this.borderRadius = 16,
+    this.scaleValue = 1.02,
+    this.borderRadius = 12,
     this.focusedBorderColor = bingeYellow,
-    this.unfocusedBorderColor = bingeDeepPurple,
-    this.borderWidth = 3,
+    this.unfocusedBorderColor = Colors.transparent,
+    this.borderWidth = 1,
     this.padding,
     this.backgroundColor = bingeDarkBg,
     this.focusedBackgroundColor,
@@ -114,16 +114,14 @@ class _TvFocusableState extends State<TvFocusable> {
                       color: _isFocused
                           ? widget.focusedBorderColor
                           : widget.unfocusedBorderColor,
-                      width: _isFocused
-                          ? widget.borderWidth + 1
-                          : widget.borderWidth,
+                      width: _isFocused ? widget.borderWidth + 1 : 1,
                     ),
                     boxShadow: _isFocused
                         ? const [
                             BoxShadow(
-                              color: Colors.black87,
-                              blurRadius: 24,
-                              offset: Offset(0, 8),
+                              color: Colors.black54,
+                              blurRadius: 18,
+                              offset: Offset(0, 6),
                             ),
                           ]
                         : null,
