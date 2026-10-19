@@ -71,14 +71,17 @@
   /* =========================================================================
    * DESKTOP VIEWPORT & BROWSER NORMALISATION
    * ========================================================================= */
-  let currentViewportContent = 'width=1280, initial-scale=1, maximum-scale=5';
+  let currentViewportContent = 'width=1920, initial-scale=1, maximum-scale=5, user-scalable=yes';
 
   function ensureDesktopViewport(targetWidth) {
     const width = targetWidth || window.__bingePageWidth || 1280;
     window.__bingePageWidth = width;
 
     let meta = document.querySelector('meta[name="viewport"]');
-    currentViewportContent = 'width=' + width + ', initial-scale=1, maximum-scale=5';
+    // The default desktop mode must start at 100% instead of scaling a
+    // 1280px virtual canvas up to a 4K television. Custom page widths remain
+    // available through the Quick Menu.
+    currentViewportContent = 'width=' + width + ', initial-scale=1, maximum-scale=5, user-scalable=yes';
 
     if (!meta) {
       meta = document.createElement('meta');
@@ -113,12 +116,8 @@
 
   function normalizeDesktopSignals() {
     try {
-      // Mock desktop navigator properties
-      Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0, configurable: true });
+      // Keep real touch capability available while presenting desktop layout.
       Object.defineProperty(navigator, 'platform', { get: () => 'Win32', configurable: true });
-      if ('ontouchstart' in window) {
-        try { delete window.ontouchstart; } catch (e) {}
-      }
       if (navigator.userAgentData) {
         try {
           Object.defineProperty(navigator.userAgentData, 'mobile', { get: () => false, configurable: true });
@@ -150,12 +149,13 @@
       'padding: 0'
     ].join(' !important;') + ' !important;';
 
-    // 1. Focus Ring Element
+    // The website supplies its own focus/selection treatment. Binge keeps
+    // spatial navigation and cursor mode, but does not draw a second ring.
     focusRingElement = document.createElement('div');
     focusRingElement.id = '__binge_tv_focus_ring';
     focusRingElement.style.cssText = [
       'position: fixed',
-      'display: none',
+      'display: none !important',
       'box-sizing: border-box',
       'border: 4px solid ' + COLOR_YELLOW,
       'border-radius: 8px',
@@ -191,6 +191,9 @@
 
   function updateFocusRing() {
     ensureOverlayContainer();
+    if (focusRingElement) focusRingElement.style.display = 'none';
+    return;
+    /*
     if (cursorMode || !currentFocusedElement || !document.contains(currentFocusedElement)) {
       if (focusRingElement) focusRingElement.style.display = 'none';
       return;
@@ -216,6 +219,7 @@
     focusRingElement.style.width = (rect.width + offset * 2) + 'px';
     focusRingElement.style.height = (rect.height + offset * 2) + 'px';
     focusRingElement.style.borderRadius = radius;
+    */
   }
 
   function updateCursorPosition(x, y) {

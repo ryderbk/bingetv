@@ -127,34 +127,41 @@ class _TvTextFieldState extends State<TvTextField> {
             width: focused ? 2 : 1,
           ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.label,
-                    style: const TextStyle(color: Colors.white54, fontSize: 15),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    widget.controller.text,
-                    style: const TextStyle(color: Colors.white, fontSize: 21),
-                  ),
-                  if (_error != null)
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _enterEditing,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      _error!,
+                      widget.label,
                       style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 16,
+                        color: Colors.white54,
+                        fontSize: 15,
                       ),
                     ),
-                ],
+                    const SizedBox(height: 5),
+                    Text(
+                      widget.controller.text,
+                      style: const TextStyle(color: Colors.white, fontSize: 21),
+                    ),
+                    if (_error != null)
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 16,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.edit, color: focused ? bingeYellow : Colors.white38),
-          ],
+              Icon(Icons.edit, color: focused ? bingeYellow : Colors.white38),
+            ],
+          ),
         ),
       ),
     );

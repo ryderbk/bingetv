@@ -3,7 +3,8 @@
 Binge is an Android TV / Fire TV launcher for BingeBang and Rivestream. It
 opens each configured link in a desktop-mode WebView and adds D-pad spatial
 navigation, cursor mode, media controls, redirect protection, diagnostics and
-safe loading fallbacks.
+safe loading fallbacks. The same interface supports touch devices, including
+portrait phone layouts and touch editing of configured links.
 
 ## Build and test
 
@@ -21,6 +22,15 @@ The APKs are copied to `dist\binge-debug.apk` and
 `dist\binge-release.apk` by the delivery workflow. A locally built APK can
 also be taken from `build\app\outputs\flutter-apk\`.
 
+## Brand assets
+
+Place the authoritative `icon.png` and 16:9 `banner.png` files in the project
+root. Run `python tools\make_banner.py` before building Android resources. The
+script preserves the supplied artwork without distortion and generates the
+launcher density variants, adaptive foreground, and Fire TV banner resources.
+The Android launcher may cache an installed icon or banner; uninstalling and
+reinstalling is sometimes required to refresh cached launcher artwork.
+
 ## Sideload to Fire TV
 
 1. On the TV open **Settings > My Fire TV > About** and select the device name
@@ -34,6 +44,17 @@ also be taken from `build\app\outputs\flutter-apk\`.
    ```
 
 4. Launch **Binge** from the Android TV / Fire TV app launcher.
+
+For a connected USB-debugging device, the repository includes a one-command
+build, install, and launch script:
+
+```powershell
+.\tools\install-device.ps1
+```
+
+It automatically finds ADB using the project SDK configuration, checks for an
+authorized device, builds the debug APK, installs it while preserving app data,
+and launches Binge.
 
 ## XMRM-P5 remote map
 

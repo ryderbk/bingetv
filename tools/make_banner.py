@@ -4,7 +4,6 @@ Utilises Pillow and bundled Inter font.
 """
 
 import os
-import math
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 COLOR_BLACK = (0, 0, 0, 255)
@@ -14,6 +13,22 @@ COLOR_DEEP_PURPLE = (76, 29, 149, 255)  # #4C1D95
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts', 'Inter-Variable.ttf')
 RES_DIR = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'res')
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+SOURCE_ICON = os.path.join(PROJECT_DIR, 'icon.png')
+SOURCE_BANNER = os.path.join(PROJECT_DIR, 'banner.png')
+
+def fit_source(path, size):
+    """Scale supplied artwork without distortion, centered on transparency."""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f'Required brand asset is missing: {path}')
+    source = Image.open(path).convert('RGBA')
+    source.thumbnail(size, Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', size, (0, 0, 0, 0))
+    canvas.alpha_composite(
+        source,
+        ((size[0] - source.width) // 2, (size[1] - source.height) // 2),
+    )
+    return canvas
 
 def draw_purple_glow(canvas, center_x, center_y, rx, ry, max_alpha=170):
     """Draws an elliptical radial purple glow behind the text."""
@@ -136,8 +151,9 @@ def create_master_icon(size=1024):
     return img
 
 def main():
-    print("[1/3] Generating 3x Master TV Banner...")
-    master_banner = create_master_banner(2880, 1620)
+    print("[1/3] Packaging supplied TV banner...")
+    source_banner = Image.open(SOURCE_BANNER).convert('RGBA')
+    print(f" -> Source banner: {source_banner.size[0]}x{source_banner.size[1]}")
 
     banner_targets = [
         ('drawable-mdpi', (320, 180)),
@@ -151,18 +167,19 @@ def main():
         dir_path = os.path.join(RES_DIR, folder)
         os.makedirs(dir_path, exist_ok=True)
         out_path = os.path.join(dir_path, 'tv_banner.png')
-        resized = master_banner.resize(dims, Image.Resampling.LANCZOS)
+        resized = fit_source(SOURCE_BANNER, dims)
         resized.save(out_path, format='PNG', optimize=True)
         print(f" -> Saved {out_path} ({dims[0]}x{dims[1]})")
 
-    print("[2/3] Generating Adaptive & Legacy Launcher Icons...")
-    master_icon = create_master_icon(1024)
+    print("[2/3] Packaging supplied launcher icon...")
+    source_icon = Image.open(SOURCE_ICON).convert('RGBA')
+    print(f" -> Source icon: {source_icon.size[0]}x{source_icon.size[1]}")
 
     # Foreground for adaptive icon
     fg_dir = os.path.join(RES_DIR, 'drawable')
     os.makedirs(fg_dir, exist_ok=True)
     fg_path = os.path.join(fg_dir, 'ic_launcher_foreground.png')
-    master_icon.resize((432, 432), Image.Resampling.LANCZOS).save(fg_path, format='PNG')
+    fit_source(SOURCE_ICON, (432, 432)).save(fg_path, format='PNG', optimize=True)
     print(f" -> Saved {fg_path} (432x432)")
 
     # Legacy mipmaps
@@ -178,7 +195,7 @@ def main():
         dir_path = os.path.join(RES_DIR, folder)
         os.makedirs(dir_path, exist_ok=True)
         out_path = os.path.join(dir_path, 'ic_launcher.png')
-        resized = master_icon.resize(dims, Image.Resampling.LANCZOS)
+        resized = fit_source(SOURCE_ICON, dims)
         resized.save(out_path, format='PNG', optimize=True)
         print(f" -> Saved {out_path} ({dims[0]}x{dims[1]})")
 

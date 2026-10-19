@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 
 import '../services/site_store.dart';
+import '../services/key_pipeline.dart';
 import '../services/url_normalizer.dart';
 import '../theme.dart';
 import '../widgets/tv_focusable.dart';
@@ -11,7 +12,9 @@ import 'web_screen.dart';
 import '../widgets/tv_text_field.dart';
 
 class SelectorScreen extends StatefulWidget {
-  const SelectorScreen({super.key});
+  const SelectorScreen({this.webScreenBuilder, super.key});
+
+  final Widget Function(Site site)? webScreenBuilder;
 
   @override
   State<SelectorScreen> createState() => _SelectorScreenState();
@@ -21,8 +24,8 @@ class _SelectorScreenState extends State<SelectorScreen> {
   final _store = SiteStore();
   List<Site> _sites = const [];
   bool _loading = true;
-  bool _showHintRow = true;
   String? _lastOpenedUrl;
+  bool _openingSite = false;
   final List<FocusNode> _cardFocusNodes = [];
   final _editButtonFocusNode = FocusNode();
   Timer? _loadTimeoutTimer;
@@ -30,6 +33,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
   @override
   void initState() {
     super.initState();
+    KeyPipeline.instance.setMode(InputMode.selector);
     _loadDataAndCheckAutoOpen();
   }
 
@@ -135,18 +139,31 @@ class _SelectorScreenState extends State<SelectorScreen> {
   }
 
   void _dismissHintRow() {
-    if (_showHintRow) {
-      setState(() => _showHintRow = false);
-    }
+    // Kept as a no-op for the shared activation path.
   }
 
   Future<void> _openSite(Site site) async {
+    if (_openingSite) return;
+    setState(() => _openingSite = true);
     _dismissHintRow();
-    await _store.setLastOpenedSite(site.url);
-    if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => WebScreen(site: site)));
+    unawaited(
+      _store.setLastOpenedSite(site.url).catchError((error, stackTrace) {
+        debugPrint('Binge: failed to save last opened site: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }),
+    );
+    try {
+      await Navigator.of(
+        context,
+      ).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              widget.webScreenBuilder?.call(site) ?? WebScreen(site: site),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _openingSite = false);
+    }
     // Reload state and focus last opened site upon return
     String? updatedLastUrl;
     List<Site> updatedSites = _sites;
@@ -159,9 +176,10 @@ class _SelectorScreenState extends State<SelectorScreen> {
       updatedSites = result[1] as List<Site>;
     } catch (_) {}
     if (mounted) {
+      _syncCardFocusNodes(updatedSites);
       setState(() {
         _sites = updatedSites;
-        _lastOpenedUrl = updatedLastUrl;
+        _lastOpenedUrl = updatedLastUrl ?? _lastOpenedUrl;
       });
       _restoreInitialFocus();
     }
@@ -212,127 +230,57 @@ class _SelectorScreenState extends State<SelectorScreen> {
           ),
           child: Column(
             children: [
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Binge',
-                  style: TextStyle(
-                    color: bingeYellow,
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1,
-                  ),
-                ),
-              ),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Choose a site',
-                  style: TextStyle(
-                    color: bingeTextSecondary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
               const SizedBox(height: 14),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 56,
-                  child: Divider(color: bingeYellow, thickness: 3),
+              const Text(
+                'Binge',
+                style: TextStyle(
+                  color: bingeYellow,
+                  fontSize: 50,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
                 ),
               ),
-              const Spacer(),
-
-              // Cards row (Natural Traversal, no pointless OrderedTraversalPolicy)
-              Center(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (var i = 0; i < _sites.length; i++) ...[
-                        _SiteCard(
-                          site: _sites[i],
-                          focusNode: i < _cardFocusNodes.length
-                              ? _cardFocusNodes[i]
-                              : null,
-                          onSelected: () => _openSite(_sites[i]),
-                          isLastOpened: _sites[i].url == _lastOpenedUrl,
-                        ),
-                        if (i < _sites.length - 1) const SizedBox(width: 24),
-                      ],
-                      const SizedBox(width: 24),
-                      TvFocusable(
-                        focusNode: _editButtonFocusNode,
-                        onSelected: _openEditor,
-                        borderRadius: 14,
-                        padding: EdgeInsets.zero,
-                        backgroundColor: bingeSurface,
-                        builder: (ctx, focused) => SizedBox(
-                          width: bingeCardWidth,
-                          height: bingeCardHeight,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.tune_rounded,
-                                color: focused ? bingeYellow : bingePurple,
-                                size: 38,
-                              ),
-                              const SizedBox(height: 18),
-                              Text(
-                                'Edit links',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 23,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Manage your sites',
-                                style: TextStyle(
-                                  color: bingeTextSecondary,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+              Expanded(
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final gap = constraints.maxWidth >= 900 ? 64.0 : 28.0;
+                      final itemWidth = ((constraints.maxWidth - gap * 2) / 3)
+                          .clamp(150.0, 250.0);
+                      final profiles = [
+                        for (var i = 0; i < _sites.length; i++)
+                          _SiteCard(
+                            site: _sites[i],
+                            width: itemWidth,
+                            focusNode: i < _cardFocusNodes.length
+                                ? _cardFocusNodes[i]
+                                : null,
+                            onSelected: () => _openSite(_sites[i]),
+                            isLastOpened: _sites[i].url == _lastOpenedUrl,
                           ),
+                        _EditProfile(
+                          width: itemWidth,
+                          focusNode: _editButtonFocusNode,
+                          onSelected: _openEditor,
                         ),
-                      ),
-                    ],
+                      ];
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (var i = 0; i < profiles.length; i++) ...[
+                              profiles[i],
+                              if (i < profiles.length - 1)
+                                SizedBox(width: gap),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-
-              const Spacer(),
-
-              // Hint row (disappears after first keypress)
-              AnimatedOpacity(
-                opacity: _showHintRow ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: bingeSurface,
-                    borderRadius: BorderRadius.circular(8),
-                    ),
-                  child: const Text(
-                    'OK select  ·  Menu options  ·  Back exit',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
             ],
           ),
         ),
@@ -345,12 +293,14 @@ class _SiteCard extends StatelessWidget {
   const _SiteCard({
     required this.site,
     required this.onSelected,
+    required this.width,
     this.focusNode,
     this.isLastOpened = false,
   });
 
   final Site site;
   final VoidCallback onSelected;
+  final double width;
   final FocusNode? focusNode;
   final bool isLastOpened;
 
@@ -359,77 +309,140 @@ class _SiteCard extends StatelessWidget {
     return TvFocusable(
       focusNode: focusNode,
       onSelected: onSelected,
-      borderRadius: 14,
-      scaleOnFocus: true,
-      scaleValue: 1.02,
-      backgroundColor: bingeSurface,
+      borderRadius: width,
+      scaleOnFocus: false,
+      backgroundColor: Colors.transparent,
+      focusedBorderColor: Colors.transparent,
+      unfocusedBorderColor: Colors.transparent,
+      borderWidth: 0,
       builder: (ctx, focused) {
+        final avatarSize = width * 0.62;
         return SizedBox(
-          width: bingeCardWidth,
-          height: bingeCardHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: const Color(0xFF29212F),
-                      child: Text(
-                        site.initial,
-                        style: const TextStyle(
-                          fontSize: 30,
-                          color: bingeYellow,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+          width: width,
+          height: width + 72,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: avatarSize,
+                height: avatarSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: focused ? const Color(0xFF30252A) : bingeSurface,
+                  border: Border.all(
+                    color: focused ? bingeYellow : bingeDivider,
+                    width: focused ? 4 : 1,
+                  ),
+                  boxShadow: focused
+                      ? const [
+                          BoxShadow(
+                            color: Color(0x55FFD600),
+                            blurRadius: 22,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  site.name,
+                child: Center(
+                  child: Text(
+                    site.initial,
+                    style: TextStyle(
+                      fontSize: avatarSize * 0.36,
+                      color: focused ? bingeYellow : Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                site.name,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: focused ? bingeYellow : Colors.white,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (isLastOpened) ...[
+                const SizedBox(height: 7),
+                const Text(
+                  'RECENT',
                   style: TextStyle(
-                    fontSize: 23,
+                    color: bingeYellow,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: focused ? bingeYellow : Colors.white,
+                    letterSpacing: 1,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  site.host,
-                  style: const TextStyle(fontSize: 15, color: bingeTextSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (isLastOpened) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: bingePurple.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'Recent',
-                      style: TextStyle(
-                        color: bingeYellow,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
               ],
-            ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EditProfile extends StatelessWidget {
+  const _EditProfile({
+    required this.width,
+    required this.focusNode,
+    required this.onSelected,
+  });
+
+  final double width;
+  final FocusNode focusNode;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return TvFocusable(
+      focusNode: focusNode,
+      onSelected: onSelected,
+      borderRadius: width,
+      scaleOnFocus: false,
+      backgroundColor: Colors.transparent,
+      focusedBorderColor: Colors.transparent,
+      unfocusedBorderColor: Colors.transparent,
+      borderWidth: 0,
+      builder: (_, focused) {
+        final avatarSize = width * 0.62;
+        return SizedBox(
+          width: width,
+          height: width + 72,
+          child: Column(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: avatarSize,
+                height: avatarSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: focused ? const Color(0xFF30252A) : bingeSurface,
+                  border: Border.all(
+                    color: focused ? bingeYellow : bingeDivider,
+                    width: focused ? 4 : 1,
+                  ),
+                ),
+                child: Icon(
+                  Icons.tune_rounded,
+                  color: focused ? bingeYellow : bingeTextSecondary,
+                  size: avatarSize * 0.34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Settings',
+                style: TextStyle(
+                  color: focused ? bingeYellow : Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -597,7 +610,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Edit links',
+                      'Settings',
                       style: TextStyle(
                         color: bingeYellow,
                         fontSize: 34,

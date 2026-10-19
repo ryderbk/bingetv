@@ -33,6 +33,8 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   int _progress = 0;
   final _loadTracker = WebLoadTracker();
   Timer? _watchdogTimer;
+  Timer? _serverRetryTimer;
+  bool _serverRetryAttempted = false;
   String? _error;
   int _blockedRequestCount = 0;
   bool _isOffline = false;
@@ -60,12 +62,13 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _currentPageWidth = widget.site.pageWidth;
+    _currentPageWidth = _resolvePageWidth(widget.site.pageWidth);
     _setupNativeKeyPipeline();
     _watchdogTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || !_loading) {
         return;
       }
+
       final now = DateTime.now();
       if (_loadTracker.state != WebLoadState.connecting &&
           now.difference(_loadTracker.lastProgress) >=
@@ -79,11 +82,23 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
           _loading = false;
           _error ??= 'The page did not commit within 20 seconds.';
         });
-        _keyPipeline.setMode(InputMode.webOverlay);
+        _keyPipeline.setMode(InputMode.webPage);
         _overlayFocusNode.requestFocus();
       }
     });
     _initEngineAndSettings();
+  }
+
+  int _resolvePageWidth(int configuredWidth) {
+    if (configuredWidth != 1920) return configuredWidth;
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty || views.first.devicePixelRatio <= 0) {
+      return configuredWidth;
+    }
+    final logicalWidth =
+        (views.first.physicalSize.width / views.first.devicePixelRatio).round();
+    if (logicalWidth <= 0) return configuredWidth;
+    return logicalWidth.clamp(1280, 1920).toInt();
   }
 
   @override
@@ -93,6 +108,7 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
     _keyPipeline.deactivateWebScreen();
     _overlayFocusNode.dispose();
     _watchdogTimer?.cancel();
+    _serverRetryTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -183,7 +199,7 @@ $scriptContent
       setState(() {
         _isQuickMenuOpen = !_isQuickMenuOpen;
       });
-      _keyPipeline.setMode(InputMode.webOverlay);
+      _keyPipeline.setMode(InputMode.webPage);
       _keyPipeline.setMode(
         _isQuickMenuOpen ? InputMode.webOverlay : InputMode.webPage,
       );
@@ -264,28 +280,6 @@ $scriptContent
     if (mounted) Navigator.of(context).pop();
   }
 
-  String _getRegistrableDomain(String host) {
-    final parts = host.toLowerCase().split('.');
-    if (parts.length <= 2) return host.toLowerCase();
-    if (parts.length >= 3 &&
-        [
-          'co',
-          'com',
-          'org',
-          'net',
-          'edu',
-          'gov',
-        ].contains(parts[parts.length - 2])) {
-      return parts.sublist(parts.length - 3).join('.');
-    }
-    return parts.sublist(parts.length - 2).join('.');
-  }
-
-  bool _isSameRegistrableDomain(Uri a, Uri b) {
-    if (a.host.isEmpty || b.host.isEmpty) return false;
-    return _getRegistrableDomain(a.host) == _getRegistrableDomain(b.host);
-  }
-
   @override
   Widget build(BuildContext context) {
     final settings = InAppWebViewSettings(
@@ -294,9 +288,10 @@ $scriptContent
       domStorageEnabled: true,
       databaseEnabled: true,
       useWideViewPort: true,
-      loadWithOverviewMode: true,
+      loadWithOverviewMode: false,
+      initialScale: 100,
       mediaPlaybackRequiresUserGesture: false,
-      supportZoom: false,
+      supportZoom: true,
       builtInZoomControls: false,
       displayZoomControls: false,
       thirdPartyCookiesEnabled: true,
@@ -331,7 +326,9 @@ $scriptContent
               initialUserScripts: _initialUserScripts,
               onWebViewCreated: (controller) {
                 _controller = controller;
-                _store.setLastOpenedSite(widget.site.url);
+                _store.setLastOpenedSite(widget.site.url).catchError((error) {
+                  debugPrint('Binge: failed to persist opened site: $error');
+                });
               },
               onLoadStart: (_, uri) {
                 _loadTracker.started();
@@ -342,7 +339,7 @@ $scriptContent
                   _error = null;
                   _isOffline = false;
                 });
-                _keyPipeline.setMode(InputMode.webOverlay);
+                _keyPipeline.setMode(InputMode.webPage);
               },
               onProgressChanged: (_, progress) {
                 if (!mounted) return;
@@ -354,24 +351,30 @@ $scriptContent
               },
               onLoadStop: (controller, uri) async {
                 // Fallback injection for frames and dynamic resets
-                final script = await rootBundle.loadString(
-                  'assets/js/tv_nav.js',
-                );
-                await controller.evaluateJavascript(
-                  source:
-                      '''
+                try {
+                  final script = await rootBundle.loadString(
+                    'assets/js/tv_nav.js',
+                  );
+                  await controller.evaluateJavascript(
+                    source:
+                        '''
 if (!window.__bingeTv || !window.__bingeTv.initialized) {
   window.__bingePageWidth = $_currentPageWidth;
   $script
 }
 ''',
-                );
+                  );
+                } catch (error) {
+                  debugPrint('Binge: navigation script fallback failed: $error');
+                }
                 if (mounted) {
                   setState(() {
                     _loading = false;
                     _loadTracker.interactive();
                     _progress = 100;
+                    _serverRetryAttempted = false;
                   });
+                  await _keyPipeline.setMode(InputMode.webPage);
                 }
               },
               onReceivedError: (_, request, error) {
@@ -386,18 +389,33 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                         error.type == WebResourceErrorType.HOST_LOOKUP;
                   });
                   _overlayFocusNode.requestFocus();
+                  _keyPipeline.setMode(InputMode.webOverlay);
                 }
               },
               onReceivedHttpError: (_, request, errorResponse) {
-                // Defect 3: Ignore 4xx/5xx on subresources
-                if ((request.isForMainFrame ?? false) &&
-                    (errorResponse.statusCode ?? 0) >= 500) {
+                final statusCode = errorResponse.statusCode ?? 0;
+                if ((request.isForMainFrame ?? false) && statusCode >= 500) {
+                  if (!_serverRetryAttempted && _serverRetryTimer == null) {
+                    _serverRetryAttempted = true;
+                    _serverRetryTimer = Timer(const Duration(seconds: 2), () {
+                      _serverRetryTimer = null;
+                      if (!mounted) return;
+                      setState(() {
+                        _loading = true;
+                        _slowNotice = false;
+                        _error = null;
+                      });
+                      _controller?.reload();
+                    });
+                    return;
+                  }
                   setState(() {
                     _loading = false;
                     _error =
-                        'Server returned error status ${errorResponse.statusCode}.';
+                        'Server returned error status $statusCode after a retry.';
                   });
                   _overlayFocusNode.requestFocus();
+                  _keyPipeline.setMode(InputMode.webOverlay);
                 }
               },
               onPermissionRequest: (_, request) async {
@@ -460,16 +478,13 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                 // Defect 7: Drop unprompted popup windows
                 final targetUri = createWindowAction.request.url;
                 final hasGesture = createWindowAction.hasGesture ?? false;
-                final currentUri = await _controller?.getUrl();
 
                 if (targetUri != null &&
                     [
                       'http',
                       'https',
                     ].contains(targetUri.scheme.toLowerCase()) &&
-                    hasGesture &&
-                    currentUri != null &&
-                    _isSameRegistrableDomain(currentUri, targetUri)) {
+                    hasGesture) {
                   await _controller?.loadUrl(
                     urlRequest: URLRequest(url: targetUri),
                   );

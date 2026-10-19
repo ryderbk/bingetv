@@ -41,8 +41,8 @@ class SiteStore {
   static const _keyBlocklist = 'binge_ad_blocklist';
 
   static const defaults = [
-    Site(name: 'BingeBang', url: 'https://bingebang.st/', pageWidth: 1280),
-    Site(name: 'Rivestream', url: 'https://rivestream.ru/', pageWidth: 1280),
+    Site(name: 'BingeBang', url: 'https://bingebang.st/', pageWidth: 1920),
+    Site(name: 'Rivestream', url: 'https://rivestream.ru/', pageWidth: 1920),
   ];
 
   static const defaultBlocklist = [
