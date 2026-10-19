@@ -1,12 +1,12 @@
 {
-    "name": "binge",
-    "short_name": "binge",
+    "name": "Binge — TV Launcher",
+    "short_name": "Binge",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#000000",
+    "theme_color": "#FFD600",
+    "description": "Minimal TV launcher for BingeBang, Rivestream and other streaming sites.",
+    "orientation": "landscape",
     "prefer_related_applications": false,
     "icons": [
         {
