@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,10 +6,12 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../services/site_store.dart';
+import '../services/redirect_policy.dart';
 import '../theme.dart';
 import '../widgets/quick_menu_overlay.dart';
 import '../widgets/tv_focusable.dart';
 import 'remote_test_screen.dart';
+import 'diagnostics_screen.dart';
 
 class WebScreen extends StatefulWidget {
   const WebScreen({required this.site, super.key});
@@ -24,7 +27,12 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
 
   InAppWebViewController? _controller;
   bool _loading = true;
+  int _progress = 0;
+  bool _pageCommitted = false;
+  DateTime _loadStartedAt = DateTime.now();
+  Timer? _watchdogTimer;
   String? _error;
+  int _blockedRequestCount = 0;
   bool _isOffline = false;
   bool _isQuickMenuOpen = false;
   bool _isCursorMode = false;
@@ -37,7 +45,8 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
   List<ContentBlocker> _contentBlockers = [];
-  UnmodifiableListView<UserScript>? _initialUserScripts;
+  UnmodifiableListView<UserScript> _initialUserScripts =
+      UnmodifiableListView<UserScript>(const []);
 
   // Focus node to take focus away from WebView when overlays are shown
   final _overlayFocusNode = FocusNode();
@@ -51,6 +60,17 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
 
     _currentPageWidth = widget.site.pageWidth;
     _setupNativeKeyPipeline();
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_loading) return;
+      final elapsed = DateTime.now().difference(_loadStartedAt);
+      if (elapsed >= const Duration(seconds: 12)) {
+        setState(() {
+          _loading = false;
+          _error ??= 'The page did not make progress for 12 seconds.';
+        });
+        _overlayFocusNode.requestFocus();
+      }
+    });
     _initEngineAndSettings();
   }
 
@@ -58,8 +78,8 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _keyChannel.invokeMethod('setWebScreenActive', {'active': false});
-    _keyChannel.setMethodCallHandler(null);
     _overlayFocusNode.dispose();
+    _watchdogTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -82,6 +102,9 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   Future<void> _setupNativeKeyPipeline() async {
     _keyChannel.setMethodCallHandler(_handleNativeKeyCall);
     await _keyChannel.invokeMethod('setWebScreenActive', {'active': true});
+    await _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+      'enabled': true,
+    });
   }
 
   Future<void> _initEngineAndSettings() async {
@@ -100,7 +123,7 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
     // 2. Load Ad-Blocker preference & hosts
     _adBlockEnabled = await _store.isAdBlockEnabled();
     final blocklist = await _store.getBlocklist();
-    _contentBlockers = blocklist.map((rule) {
+    _contentBlockers = SiteStore.validBlocklistRules(blocklist).map((rule) {
       return ContentBlocker(
         trigger: ContentBlockerTrigger(urlFilter: rule),
         action: ContentBlockerAction(type: ContentBlockerActionType.BLOCK),
@@ -115,7 +138,7 @@ window.__bingePageWidth = $_currentPageWidth;
 $scriptContent
 ''';
 
-    _initialUserScripts = UnmodifiableListView([
+    final userScripts = UnmodifiableListView([
       UserScript(
         source: injectedNavScript,
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
@@ -123,7 +146,12 @@ $scriptContent
       ),
     ]);
 
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() => _initialUserScripts = userScripts);
+      if (_controller != null) {
+        await _controller!.addUserScript(userScript: userScripts.first);
+      }
+    }
   }
 
   Future<void> _handleNativeKeyCall(MethodCall call) async {
@@ -143,6 +171,9 @@ $scriptContent
       setState(() {
         _isQuickMenuOpen = !_isQuickMenuOpen;
       });
+      _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+        'enabled': !_isQuickMenuOpen,
+      });
       if (_isQuickMenuOpen) {
         _overlayFocusNode.requestFocus();
       }
@@ -152,6 +183,9 @@ $scriptContent
     if (_isQuickMenuOpen) {
       if (action == 'Back') {
         setState(() => _isQuickMenuOpen = false);
+        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+          'enabled': true,
+        });
       }
       return;
     }
@@ -279,141 +313,169 @@ $scriptContent
             const Positioned.fill(child: ColoredBox(color: Colors.black)),
 
             // WebView
-            if (_initialUserScripts != null)
-              InAppWebView(
-                initialUrlRequest: URLRequest(url: WebUri(widget.site.url)),
-                initialSettings: settings,
-                initialUserScripts: _initialUserScripts,
-                onWebViewCreated: (controller) {
-                  _controller = controller;
-                  _store.setLastOpenedSite(widget.site.url);
-                },
-                onLoadStart: (_, uri) {
-                  setState(() {
-                    _loading = true;
-                    _error = null;
-                    _isOffline = false;
-                  });
-                },
-                onLoadStop: (controller, uri) async {
-                  // Fallback injection for frames and dynamic resets
-                  final script = await rootBundle.loadString(
-                    'assets/js/tv_nav.js',
-                  );
-                  await controller.evaluateJavascript(
-                    source:
-                        '''
+            InAppWebView(
+              initialUrlRequest: URLRequest(url: WebUri(widget.site.url)),
+              initialSettings: settings,
+              initialUserScripts: _initialUserScripts,
+              onWebViewCreated: (controller) {
+                _controller = controller;
+                _store.setLastOpenedSite(widget.site.url);
+              },
+              onLoadStart: (_, uri) {
+                _loadStartedAt = DateTime.now();
+                _pageCommitted = false;
+                setState(() {
+                  _loading = true;
+                  _progress = 0;
+                  _error = null;
+                  _isOffline = false;
+                });
+              },
+              onProgressChanged: (_, progress) {
+                if (!mounted) return;
+                setState(() {
+                  _progress = progress;
+                  if (progress >= 50) _pageCommitted = true;
+                  if (progress >= 100) _loading = false;
+                });
+              },
+              onLoadStop: (controller, uri) async {
+                // Fallback injection for frames and dynamic resets
+                final script = await rootBundle.loadString(
+                  'assets/js/tv_nav.js',
+                );
+                await controller.evaluateJavascript(
+                  source:
+                      '''
 if (!window.__bingeTv || !window.__bingeTv.initialized) {
   window.__bingePageWidth = $_currentPageWidth;
   $script
 }
 ''',
-                  );
-                  if (mounted) setState(() => _loading = false);
-                },
-                onReceivedError: (_, request, error) {
-                  // Defect 3: Only main frame errors show the error overlay!
-                  if (request.isForMainFrame ?? false) {
-                    setState(() {
-                      _loading = false;
-                      _error = error.description;
-                      _isOffline =
-                          error.type ==
-                              WebResourceErrorType.CANNOT_CONNECT_TO_HOST ||
-                          error.type == WebResourceErrorType.HOST_LOOKUP;
-                    });
-                    _overlayFocusNode.requestFocus();
-                  }
-                },
-                onReceivedHttpError: (_, request, errorResponse) {
-                  // Defect 3: Ignore 4xx/5xx on subresources
-                  if ((request.isForMainFrame ?? false) &&
-                      (errorResponse.statusCode ?? 0) >= 500) {
-                    setState(() {
-                      _loading = false;
-                      _error =
-                          'Server returned error status ${errorResponse.statusCode}.';
-                    });
-                    _overlayFocusNode.requestFocus();
-                  }
-                },
-                onPermissionRequest: (_, request) async {
-                  // Grant only Widevine DRM / EME
-                  final granted = <PermissionResourceType>[];
-                  if (request.resources.contains(
-                    PermissionResourceType.PROTECTED_MEDIA_ID,
-                  )) {
-                    granted.add(PermissionResourceType.PROTECTED_MEDIA_ID);
-                  }
-                  return PermissionResponse(
-                    resources: granted,
-                    action: granted.isNotEmpty
-                        ? PermissionResponseAction.GRANT
-                        : PermissionResponseAction.DENY,
-                  );
-                },
-                shouldOverrideUrlLoading: (_, navigationAction) async {
-                  final uri = navigationAction.request.url;
-                  if (uri == null) return NavigationActionPolicy.CANCEL;
+                );
+                if (mounted) {
+                  setState(() {
+                    _loading = false;
+                    _pageCommitted = true;
+                    _progress = 100;
+                  });
+                }
+              },
+              onReceivedError: (_, request, error) {
+                // Defect 3: Only main frame errors show the error overlay!
+                if (request.isForMainFrame ?? false) {
+                  setState(() {
+                    _loading = false;
+                    _error = error.description;
+                    _isOffline =
+                        error.type ==
+                            WebResourceErrorType.CANNOT_CONNECT_TO_HOST ||
+                        error.type == WebResourceErrorType.HOST_LOOKUP;
+                  });
+                  _overlayFocusNode.requestFocus();
+                }
+              },
+              onReceivedHttpError: (_, request, errorResponse) {
+                // Defect 3: Ignore 4xx/5xx on subresources
+                if ((request.isForMainFrame ?? false) &&
+                    (errorResponse.statusCode ?? 0) >= 500) {
+                  setState(() {
+                    _loading = false;
+                    _error =
+                        'Server returned error status ${errorResponse.statusCode}.';
+                  });
+                  _overlayFocusNode.requestFocus();
+                }
+              },
+              onPermissionRequest: (_, request) async {
+                // Grant only Widevine DRM / EME
+                final granted = <PermissionResourceType>[];
+                if (request.resources.contains(
+                  PermissionResourceType.PROTECTED_MEDIA_ID,
+                )) {
+                  granted.add(PermissionResourceType.PROTECTED_MEDIA_ID);
+                }
+                return PermissionResponse(
+                  resources: granted,
+                  action: granted.isNotEmpty
+                      ? PermissionResponseAction.GRANT
+                      : PermissionResponseAction.DENY,
+                );
+              },
+              shouldOverrideUrlLoading: (_, navigationAction) async {
+                final uri = navigationAction.request.url;
+                if (uri == null) return NavigationActionPolicy.CANCEL;
 
-                  // Block non-http/https schemes
-                  if (!['http', 'https'].contains(uri.scheme.toLowerCase())) {
-                    return NavigationActionPolicy.CANCEL;
-                  }
+                // Block non-http/https schemes
+                if (!['http', 'https'].contains(uri.scheme.toLowerCase())) {
+                  return NavigationActionPolicy.CANCEL;
+                }
 
-                  // Allow explicit one-time override
-                  if (_allowedRedirectUrlOnce != null &&
-                      uri.toString() == _allowedRedirectUrlOnce) {
-                    _allowedRedirectUrlOnce = null;
-                    return NavigationActionPolicy.ALLOW;
-                  }
-
-                  // Check cross-domain top-level redirect without user gesture
-                  final currentUri = await _controller?.getUrl();
-                  if (currentUri != null && currentUri.host.isNotEmpty) {
-                    final sameDomain = _isSameRegistrableDomain(
-                      currentUri,
-                      uri,
-                    );
-                    final isUserGesture = navigationAction.hasGesture ?? false;
-
-                    if (!sameDomain && !isUserGesture) {
-                      setState(() => _pendingBlockedRedirect = uri.toString());
-                      return NavigationActionPolicy.CANCEL;
-                    }
-                  }
-
+                // Allow explicit one-time override
+                if (_allowedRedirectUrlOnce != null &&
+                    uri.toString() == _allowedRedirectUrlOnce) {
+                  _allowedRedirectUrlOnce = null;
                   return NavigationActionPolicy.ALLOW;
-                },
-                onCreateWindow: (_, createWindowAction) async {
-                  // Defect 7: Drop unprompted popup windows
-                  final targetUri = createWindowAction.request.url;
-                  final hasGesture = createWindowAction.hasGesture ?? false;
-                  final currentUri = await _controller?.getUrl();
+                }
 
-                  if (targetUri != null &&
-                      [
-                        'http',
-                        'https',
-                      ].contains(targetUri.scheme.toLowerCase()) &&
-                      hasGesture &&
-                      currentUri != null &&
-                      _isSameRegistrableDomain(currentUri, targetUri)) {
-                    await _controller?.loadUrl(
-                      urlRequest: URLRequest(url: targetUri),
-                    );
-                    return true;
+                // Allow the initial redirect chain, but reject later ad
+                // hijacks that leave the committed site without a gesture.
+                final currentUri = await _controller?.getUrl();
+                final decision = redirectDecision(
+                  currentUrl: currentUri,
+                  targetUrl: uri,
+                  isRedirect: navigationAction.isRedirect ?? false,
+                  hasGesture: navigationAction.hasGesture ?? false,
+                  timeSinceLoad: DateTime.now().difference(_loadStartedAt),
+                  pageCommitted: _pageCommitted,
+                );
+                if (decision == RedirectDecision.block) {
+                  if (mounted) {
+                    setState(() {
+                      _pendingBlockedRedirect = uri.toString();
+                      _blockedRequestCount++;
+                    });
                   }
-                  return false; // Drop ad popups silently
-                },
-              ),
+                  return NavigationActionPolicy.CANCEL;
+                }
 
-            // Loading spinner
+                return NavigationActionPolicy.ALLOW;
+              },
+              onCreateWindow: (_, createWindowAction) async {
+                // Defect 7: Drop unprompted popup windows
+                final targetUri = createWindowAction.request.url;
+                final hasGesture = createWindowAction.hasGesture ?? false;
+                final currentUri = await _controller?.getUrl();
+
+                if (targetUri != null &&
+                    [
+                      'http',
+                      'https',
+                    ].contains(targetUri.scheme.toLowerCase()) &&
+                    hasGesture &&
+                    currentUri != null &&
+                    _isSameRegistrableDomain(currentUri, targetUri)) {
+                  await _controller?.loadUrl(
+                    urlRequest: URLRequest(url: targetUri),
+                  );
+                  return true;
+                }
+                return false; // Drop ad popups silently
+              },
+            ),
+
+            // The WebView remains visible while a slim, non-blocking progress
+            // indicator communicates startup and navigation progress.
             if (_loading && _error == null)
-              const Center(
-                child: CircularProgressIndicator(
-                  color: bingeYellow,
-                  strokeWidth: 4,
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _progress > 0 ? _progress / 100 : null,
+                  minHeight: 4,
+                  backgroundColor: Colors.white12,
+                  valueColor: const AlwaysStoppedAnimation(bingeYellow),
                 ),
               ),
 
@@ -423,7 +485,12 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
             // Themed Quick Menu Overlay
             if (_isQuickMenuOpen)
               QuickMenuOverlay(
-                onResume: () => setState(() => _isQuickMenuOpen = false),
+                onResume: () {
+                  setState(() => _isQuickMenuOpen = false);
+                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+                    'enabled': true,
+                  });
+                },
                 onReload: () {
                   setState(() => _isQuickMenuOpen = false);
                   _controller?.reload();
@@ -469,9 +536,42 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                 },
                 onOpenRemoteTest: () {
                   setState(() => _isQuickMenuOpen = false);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const RemoteTestScreen()),
-                  );
+                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+                    'enabled': false,
+                  });
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => const RemoteTestScreen(),
+                        ),
+                      )
+                      .whenComplete(() {
+                        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+                          'enabled': true,
+                        });
+                      });
+                },
+                onOpenDiagnostics: () {
+                  setState(() => _isQuickMenuOpen = false);
+                  _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+                    'enabled': false,
+                  });
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => DiagnosticsScreen(
+                            lastUrl: widget.site.url,
+                            lastError: _error,
+                            blockedRequestCount: _blockedRequestCount,
+                            ruleCount: _contentBlockers.length,
+                          ),
+                        ),
+                      )
+                      .whenComplete(() {
+                        _keyChannel.invokeMethod('setNativeInterceptEnabled', {
+                          'enabled': true,
+                        });
+                      });
                 },
                 webViewVersion: _webViewVersion,
               ),

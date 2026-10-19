@@ -85,8 +85,9 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
         });
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _webViewVersion = 'Standard WebView (API 30)');
+      }
     }
   }
 

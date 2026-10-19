@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../services/site_store.dart';
 import '../services/url_normalizer.dart';
@@ -23,6 +24,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
   String? _lastOpenedUrl;
   final List<FocusNode> _cardFocusNodes = [];
   final _editButtonFocusNode = FocusNode();
+  Timer? _loadTimeoutTimer;
 
   @override
   void initState() {
@@ -36,13 +38,22 @@ class _SelectorScreenState extends State<SelectorScreen> {
       node.dispose();
     }
     _editButtonFocusNode.dispose();
+    _loadTimeoutTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _loadDataAndCheckAutoOpen() async {
-    final sites = await _store.load();
-    final lastUrl = await _store.getLastOpenedSite();
-    final openLastOnStart = await _store.getOpenLastOnStart();
+    List<Site> sites = SiteStore.defaults;
+    String? lastUrl;
+    var openLastOnStart = false;
+    try {
+      final result = await _loadPreferencesWithTimeout();
+      sites = result[0] as List<Site>;
+      lastUrl = result[1] as String?;
+      openLastOnStart = result[2] as bool;
+    } catch (_) {
+      // Defaults keep the selector usable when preferences are unavailable.
+    }
 
     if (!mounted) return;
 
@@ -69,6 +80,27 @@ class _SelectorScreenState extends State<SelectorScreen> {
     }
 
     _restoreInitialFocus();
+  }
+
+  Future<List<dynamic>> _loadPreferencesWithTimeout() {
+    final completer = Completer<List<dynamic>>();
+    void finish(List<dynamic> value) {
+      if (!completer.isCompleted) {
+        _loadTimeoutTimer?.cancel();
+        completer.complete(value);
+      }
+    }
+
+    Future.wait([
+      _store.load(),
+      _store.getLastOpenedSite(),
+      _store.getOpenLastOnStart(),
+    ]).then(finish, onError: (_) => finish([SiteStore.defaults, null, false]));
+    _loadTimeoutTimer = Timer(
+      const Duration(seconds: 3),
+      () => finish([SiteStore.defaults, null, false]),
+    );
+    return completer.future;
   }
 
   void _restoreInitialFocus() {
@@ -99,8 +131,16 @@ class _SelectorScreenState extends State<SelectorScreen> {
       context,
     ).push(MaterialPageRoute(builder: (_) => WebScreen(site: site)));
     // Reload state and focus last opened site upon return
-    final updatedLastUrl = await _store.getLastOpenedSite();
-    final updatedSites = await _store.load();
+    String? updatedLastUrl;
+    List<Site> updatedSites = _sites;
+    try {
+      final result = await Future.wait([
+        _store.getLastOpenedSite(),
+        _store.load(),
+      ]).timeout(const Duration(seconds: 3));
+      updatedLastUrl = result[0] as String?;
+      updatedSites = result[1] as List<Site>;
+    } catch (_) {}
     if (mounted) {
       setState(() {
         _sites = updatedSites;
@@ -117,7 +157,10 @@ class _SelectorScreenState extends State<SelectorScreen> {
         builder: (_) => EditSitesScreen(sites: _sites, store: _store),
       ),
     );
-    final sites = await _store.load();
+    List<Site> sites = _sites;
+    try {
+      sites = await _store.load().timeout(const Duration(seconds: 3));
+    } catch (_) {}
     if (mounted) {
       _cardFocusNodes.clear();
       for (var i = 0; i < sites.length; i++) {

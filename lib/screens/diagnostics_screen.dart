@@ -1,0 +1,134 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+
+import '../theme.dart';
+import '../widgets/tv_focusable.dart';
+
+class DiagnosticsScreen extends StatefulWidget {
+  const DiagnosticsScreen({
+    required this.lastUrl,
+    required this.lastError,
+    required this.blockedRequestCount,
+    required this.ruleCount,
+    super.key,
+  });
+
+  final String? lastUrl;
+  final String? lastError;
+  final int blockedRequestCount;
+  final int ruleCount;
+
+  @override
+  State<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
+}
+
+class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
+  static const _channel = MethodChannel('com.binge.app/key_pipeline');
+  String _report = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    String webView = 'System WebView';
+    try {
+      final package = await InAppWebViewController.getCurrentWebViewPackage();
+      if (package != null) {
+        webView = '${package.packageName} (${package.versionName})';
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _report = _buildReport(webView);
+    });
+  }
+
+  String _buildReport(String webView) {
+    return [
+      'Binge diagnostics',
+      'WebView: $webView',
+      'Last URL: ${widget.lastUrl ?? 'none'}',
+      'Last error: ${widget.lastError ?? 'none'}',
+      'Blocked requests: ${widget.blockedRequestCount}',
+      'Content-blocker rules: ${widget.ruleCount}',
+      'Key pipeline: native interception channel enabled',
+      'Viewport: WebView reports at runtime; desktop width is site-configured',
+    ].join('\n');
+  }
+
+  Future<void> _copyReport() async {
+    await _channel.invokeMethod('copyDiagnostics', {'report': _report});
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved diagnostics.txt')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        minimum: const EdgeInsets.all(40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Diagnostics',
+              style: TextStyle(
+                color: bingeYellow,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              _report.isEmpty ? 'Loading...' : _report,
+              style: const TextStyle(color: Colors.white70, fontSize: 18),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                TvFocusable(
+                  autofocus: true,
+                  onSelected: _copyReport,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  builder: (_, focused) => Text(
+                    'Copy report',
+                    style: TextStyle(
+                      color: focused ? bingeYellow : Colors.white,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                TvFocusable(
+                  onSelected: () => Navigator.of(context).pop(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  builder: (_, focused) => Text(
+                    'Back',
+                    style: TextStyle(
+                      color: focused ? bingeYellow : Colors.white,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

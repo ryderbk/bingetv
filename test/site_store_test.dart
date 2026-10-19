@@ -74,7 +74,7 @@ void main() {
       await store.setAdBlockEnabled(false);
       expect(await store.isAdBlockEnabled(), isFalse);
 
-      final customRules = ['*ads.com*', '*track.org*'];
+      final customRules = [r'.*ads\.com.*', r'.*track\.org.*'];
       await store.setBlocklist(customRules);
       expect(await store.getBlocklist(), customRules);
     });

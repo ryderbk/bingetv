@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -16,13 +17,14 @@ class MainActivity : FlutterActivity() {
 
     private var methodChannel: MethodChannel? = null
     private var webScreenActive = false
+    private var nativeInterceptEnabled = false
     private var remoteTestActive = false
 
     // Long press tracking for remote keys (especially DPAD_CENTER / OK)
     private val handler = Handler(Looper.getMainLooper())
-    private var pendingLongPressRunnable: Runnable? = null
-    private var longPressTriggered = false
-    private var activeDownKeyCode = -1
+    private val pendingLongPressRunnables = mutableMapOf<Int, Runnable>()
+    private val longPressTriggered = mutableSetOf<Int>()
+    private val interceptedDownKeys = mutableSetOf<Int>()
 
     // Data-driven remote map: KeyCode -> Action identifier
     private val remoteKeyMap = mutableMapOf<Int, String>(
@@ -72,6 +74,11 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "setWebScreenActive" -> {
                         webScreenActive = call.argument<Boolean>("active") ?: false
+                        if (!webScreenActive) nativeInterceptEnabled = false
+                        result.success(true)
+                    }
+                    "setNativeInterceptEnabled" -> {
+                        nativeInterceptEnabled = call.argument<Boolean>("enabled") ?: false
                         result.success(true)
                     }
                     "setRemoteTestActive" -> {
@@ -91,6 +98,16 @@ class MainActivity : FlutterActivity() {
                     "getRemoteMap" -> {
                         val map = remoteKeyMap.mapKeys { it.key.toString() }
                         result.success(map)
+                    }
+                    "copyDiagnostics" -> {
+                        val report = call.argument<String>("report")
+                        if (report == null) {
+                            result.error("INVALID_ARGS", "report missing", null)
+                        } else {
+                            val file = File(getExternalFilesDir(null), "diagnostics.txt")
+                            file.writeText(report)
+                            result.success(file.absolutePath)
+                        }
                     }
                     else -> result.notImplemented()
                 }
@@ -124,47 +141,43 @@ class MainActivity : FlutterActivity() {
         }
 
         // If web screen is active, intercept remote keys to prevent WebView / OS eating them
-        if (webScreenActive) {
+        if (webScreenActive && nativeInterceptEnabled) {
             val actionName = remoteKeyMap[keyCode]
             if (actionName != null) {
                 if (isDown) {
                     // Check for OK / Select long-press
                     if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) && repeat == 0) {
-                        activeDownKeyCode = keyCode
-                        longPressTriggered = false
-                        pendingLongPressRunnable?.let { handler.removeCallbacks(it) }
+                        interceptedDownKeys.add(keyCode)
+                        longPressTriggered.remove(keyCode)
+                        pendingLongPressRunnables[keyCode]?.let { handler.removeCallbacks(it) }
                         val runnable = Runnable {
-                            longPressTriggered = true
+                            longPressTriggered.add(keyCode)
                             Log.d(TAG, "Triggered long-press for $actionName")
                             sendKeyToFlutter(actionName, repeat = 0, isLongPress = true, keyCode = keyCode)
                         }
-                        pendingLongPressRunnable = runnable
+                        pendingLongPressRunnables[keyCode] = runnable
                         handler.postDelayed(runnable, 600)
                     } else if (repeat > 0) {
                         // Key repeat (e.g. holding D-pad arrow or rewind/FF)
-                        if (pendingLongPressRunnable != null && !longPressTriggered) {
-                            // repeated press while holding
-                        }
+                        interceptedDownKeys.add(keyCode)
                         sendKeyToFlutter(actionName, repeat = repeat, isLongPress = false, keyCode = keyCode)
                     } else {
                         // First key down for other keys (or repeated)
+                        interceptedDownKeys.add(keyCode)
                         sendKeyToFlutter(actionName, repeat = repeat, isLongPress = false, keyCode = keyCode)
                     }
                     return true
                 } else if (event.action == KeyEvent.ACTION_UP) {
-                    if (activeDownKeyCode == keyCode) {
-                        pendingLongPressRunnable?.let { handler.removeCallbacks(it) }
-                        pendingLongPressRunnable = null
-                        if (!longPressTriggered) {
+                    if (interceptedDownKeys.remove(keyCode)) {
+                        pendingLongPressRunnables.remove(keyCode)?.let { handler.removeCallbacks(it) }
+                        if (!longPressTriggered.remove(keyCode)) {
                             // Normal single click release
                             sendKeyToFlutter(actionName, repeat = 0, isLongPress = false, keyCode = keyCode)
                         }
-                        activeDownKeyCode = -1
-                        longPressTriggered = false
                         return true
                     }
-                    // For back or other keys on up, already handled on down
-                    return true
+                    // Do not swallow an UP for a DOWN handled by Flutter/IME.
+                    return super.dispatchKeyEvent(event)
                 }
             }
         }

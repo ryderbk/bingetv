@@ -45,19 +45,34 @@ class SiteStore {
   ];
 
   static const defaultBlocklist = [
-    '*doubleclick.net*',
-    '*googlesyndication.com*',
-    '*googleadservices.com*',
-    '*popads.net*',
-    '*popcash.net*',
-    '*adsterra.com*',
-    '*propellerads.com*',
-    '*exoclick.com*',
-    '*juicyads.com*',
-    '*trafficjunky.net*',
-    '*bet365*',
-    '*1xbet*',
+    r'.*doubleclick\.net.*',
+    r'.*googlesyndication\.com.*',
+    r'.*googleadservices\.com.*',
+    r'.*popads\.net.*',
+    r'.*popcash\.net.*',
+    r'.*adsterra\.com.*',
+    r'.*propellerads\.com.*',
+    r'.*exoclick\.com.*',
+    r'.*juicyads\.com.*',
+    r'.*trafficjunky\.net.*',
   ];
+
+  static bool isValidBlocklistRule(String rule) {
+    if (rule.trim().isEmpty) return false;
+    try {
+      RegExp(rule);
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static List<String> validBlocklistRules(Iterable<String> rules) {
+    return rules
+        .map((rule) => rule.trim())
+        .where(isValidBlocklistRule)
+        .toList(growable: false);
+  }
 
   Future<List<Site>> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -130,11 +145,12 @@ class SiteStore {
 
   Future<List<String>> getBlocklist() async {
     final preferences = await SharedPreferences.getInstance();
-    return preferences.getStringList(_keyBlocklist) ?? defaultBlocklist;
+    final saved = preferences.getStringList(_keyBlocklist);
+    return validBlocklistRules(saved ?? defaultBlocklist);
   }
 
   Future<void> setBlocklist(List<String> list) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setStringList(_keyBlocklist, list);
+    await preferences.setStringList(_keyBlocklist, validBlocklistRules(list));
   }
 }
