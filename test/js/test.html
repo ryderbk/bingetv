@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Binge TV Navigation Test Suite</title>
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 30px;
+    }
+    .layout {
+      display: flex;
+      gap: 40px;
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 200px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 220px);
+      gap: 20px;
+    }
+    .card, .btn {
+      background: #1e1b29;
+      border: 2px solid #4c1d95;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 12px;
+      color: white;
+    }
+    input {
+      padding: 12px;
+      font-size: 18px;
+      background: #16121f;
+      border: 2px solid #4c1d95;
+      color: #ffd600;
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 20px;
+    }
+    video {
+      width: 320px;
+      height: 180px;
+      background: #222;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 20%;
+      left: 30%;
+      width: 40%;
+      background: #110e19;
+      border: 3px solid #7c3aed;
+      padding: 30px;
+      z-index: 1000;
+      border-radius: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Binge TV Navigation Test</h1>
+  <input type="text" id="search-input" placeholder="Search movies...">
+
+  <div class="layout">
+    <div class="sidebar">
+      <button class="btn" id="side-home">Home</button>
+      <button class="btn" id="side-movies">Movies</button>
+      <button class="btn" id="side-settings">Settings</button>
+      <button class="btn" id="open-modal-btn">Open Dialog</button>
+    </div>
+
+    <div class="main">
+      <div class="grid">
+        <div class="card" id="card-1" role="button" tabindex="0">Card 1</div>
+        <div class="card" id="card-2" role="button" tabindex="0">Card 2</div>
+        <div class="card" id="card-3" role="button" tabindex="0">Card 3</div>
+        <div class="card" id="card-4" role="button" tabindex="0">Card 4</div>
+      </div>
+
+      <video id="test-video" controls>
+        <!-- Mock video track -->
+      </video>
+    </div>
+  </div>
+
+  <div class="modal" id="test-modal" role="dialog" aria-modal="true">
+    <h2>Sample Modal Overlay</h2>
+    <p>Testing remote Back button modal dismissal.</p>
+    <button class="btn" id="modal-close" aria-label="close">Close Modal</button>
+  </div>
+
+  <script src="../../assets/js/tv_nav.js"></script>
+  <script>
+    document.getElementById('open-modal-btn').addEventListener('click', () => {
+      document.getElementById('test-modal').style.display = 'block';
+    });
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('test-modal').style.display = 'none';
+    });
+  </script>
+</body>
+</html>
