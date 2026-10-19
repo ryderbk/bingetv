@@ -22,3 +22,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/js/tv_nav.js
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
