@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 const bingeYellow = Color(0xFFFFD600);
 const bingePurple = Color(0xFF7C3AED);
 const bingeDeepPurple = Color(0xFF4C1D95);
+const bingeDarkBg = Color(0xFF0D0A12);
+const bingeFieldBg = Color(0xFF16121F);
 
 ThemeData buildBingeTheme() {
   final base = ThemeData.dark(useMaterial3: true);
@@ -16,11 +18,11 @@ ThemeData buildBingeTheme() {
     textTheme: base.textTheme.apply(
       bodyColor: Colors.white,
       displayColor: Colors.white,
-      fontFamily: 'sans',
+      fontFamily: 'Inter',
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF16121F),
+      fillColor: bingeFieldBg,
       labelStyle: const TextStyle(color: Colors.white70, fontSize: 24),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
