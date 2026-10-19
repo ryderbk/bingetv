@@ -1,10 +1,13 @@
 # Binge
 
-Binge is a minimal Android TV launcher for streaming websites. It opens each
-configured site in a desktop-mode WebView and adds a TV-focused spatial
-navigation layer for D-pad remotes.
+Binge is an Android TV / Fire TV launcher for BingeBang and Rivestream. It
+opens each configured link in a desktop-mode WebView and adds D-pad spatial
+navigation, cursor mode, media controls, redirect protection, diagnostics and
+safe loading fallbacks.
 
-## Build
+## Build and test
+
+From the repository root:
 
 ```powershell
 flutter pub get
@@ -14,42 +17,65 @@ flutter build apk --debug
 flutter build apk --release
 ```
 
-Debug and release APKs are copied to `dist/` by the delivery workflow. The
-release build uses the generated debug signing key so it can be sideloaded
-locally; configure a real release keystore before publishing.
+The APKs are copied to `dist\binge-debug.apk` and
+`dist\binge-release.apk` by the delivery workflow. A locally built APK can
+also be taken from `build\app\outputs\flutter-apk\`.
 
-## Sideload
+## Sideload to Fire TV
+
+1. On the TV open **Settings > My Fire TV > About** and select the device name
+   seven times to enable Developer Options.
+2. Enable **ADB debugging** and **Install unknown apps** for the installer.
+3. Find the TV IP address and connect:
+
+   ```powershell
+   adb connect <ip>:5555
+   adb install -r dist\binge-debug.apk
+   ```
+
+4. Launch **Binge** from the Android TV / Fire TV app launcher.
+
+## XMRM-P5 remote map
+
+| Remote key | Binge action |
+| --- | --- |
+| D-pad / OK | Move focus / activate |
+| Back | Close overlay, WebView history, or return to sites |
+| Menu | Open the Quick Menu |
+| Guide | Return to the site selector |
+| Red | Toggle cursor mode |
+| Blue | Reload the current page |
+| Play/Pause | Toggle HTML5 playback |
+| Rewind / Fast-forward | Seek |
+| Channel +/- | Page/channel navigation |
+| Info / Subtitle | Site navigation actions |
+| 0-9 | Number shortcuts |
+
+Home, Voice, Power, volume and shortcut keys are handled by Fire OS and are
+not delivered to the application.
+
+## Links, safe mode and diagnostics
+
+Use **Edit links** on the selector to change site names or URLs. A missing
+scheme is normalized to `https://`. The Quick Menu remains available without
+JavaScript and contains reload, home, safe loading, diagnostics, page width
+and ad-block controls.
+
+The WebView is created immediately with safe defaults. If startup fails, the
+selector falls back to the built-in links. A page that makes no progress for
+12 seconds displays Retry, Safe mode, Edit link and Back to sites instead of
+leaving a spinner on screen. Safe mode disables the document-start navigation
+script and content blockers for troubleshooting.
+
+Open **Quick Menu > Diagnostics** to inspect the WebView package, user agent,
+viewport, last URL/error, blocked requests, key pipeline and recent logs.
+**Copy report** writes `diagnostics.txt` under the app's external files
+directory so it can be retrieved with:
 
 ```powershell
-adb connect <tv-ip>:5555
-adb install -r dist\app-release.apk
+adb pull /sdcard/Android/data/com.binge.app/files/diagnostics.txt
 ```
 
-The app is registered with both the standard launcher and Android TV's
-Leanback launcher. The TV banner and Binge icon are included in the Android
-resources.
-
-## Remote controls
-
-- D-pad arrows: move between selector controls or spatially navigate a site.
-- OK/Select/Enter: open a site, activate a focused web control, or focus a
-  text field for the TV keyboard.
-- Back: close the editor; in a WebView, go back in page history or return to
-  the site selector; on the selector, exit the app.
-- Menu/Context Menu or `M`: toggle cursor mode for canvas/custom players.
-- Media Play/Pause: toggle the main HTML5 video.
-- In focus mode, Left/Right seek a focused video by ten seconds.
-
-## Editing links
-
-Choose **Edit links** on the selector, change the name or URL, and choose
-**Save**. URLs without a scheme are automatically prefixed with `https://`.
-**Reset to defaults** removes the saved list and restores BingeBang and
-Rivestream.
-
-## Notes
-
-The app requires network access. The injected navigation script is intentionally
-generic because third-party sites can change their markup at any time. A TV
-emulator or connected Android TV device is required for end-to-end remote and
-video validation.
+See [docs/DEVICE_TEST.md](docs/DEVICE_TEST.md) for the physical Xiaomi TV
+checklist and [docs/diagnosis.md](docs/diagnosis.md) for the startup-hang
+analysis.
