@@ -14,8 +14,8 @@ COLOR_DEEP_PURPLE = (76, 29, 149, 255)  # #4C1D95
 FONT_PATH = os.path.join(os.path.dirname(__file__), '..', 'assets', 'fonts', 'Inter-Variable.ttf')
 RES_DIR = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'res')
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-SOURCE_ICON = os.path.join(PROJECT_DIR, 'icon.png')
-SOURCE_BANNER = os.path.join(PROJECT_DIR, 'banner.png')
+SOURCE_ICON = os.path.join(PROJECT_DIR, 'assets', 'branding', 'icon.png')
+SOURCE_BANNER = os.path.join(PROJECT_DIR, 'assets', 'branding', 'banner.png')
 
 def fit_source(path, size):
     """Scale supplied artwork without distortion, centered on transparency."""

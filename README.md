@@ -24,8 +24,8 @@ also be taken from `build\app\outputs\flutter-apk\`.
 
 ## Brand assets
 
-Place the authoritative `icon.png` and 16:9 `banner.png` files in the project
-root. Run `python tools\make_banner.py` before building Android resources. The
+Place the authoritative `icon.png` and 16:9 `banner.png` files in
+`assets\branding\`. Run `python tools\make_banner.py` before building Android resources. The
 script preserves the supplied artwork without distortion and generates the
 launcher density variants, adaptive foreground, and Fire TV banner resources.
 The Android launcher may cache an installed icon or banner; uninstalling and
