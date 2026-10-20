@@ -106,9 +106,9 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
         child: Scaffold(
           backgroundColor: bingeBackground,
           body: SafeArea(
-            minimum: const EdgeInsets.symmetric(
-              horizontal: bingePagePadding,
-              vertical: 32,
+            minimum: bingePageInsets(
+              MediaQuery.sizeOf(context).width,
+              vertical: 24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,22 +116,28 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Remote Key Diagnostics',
-                          style: TextStyle(
-                            color: bingeYellow,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w800,
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Remote Key Diagnostics',
+                            style: TextStyle(
+                              color: bingeYellow,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Text(
-                          'Xiaomi XMRM-P5 Remote Verification (Fire OS 8 / Android 11)',
-                          style: TextStyle(color: bingeTextSecondary, fontSize: 16),
-                        ),
-                      ],
+                          Text(
+                            'Xiaomi XMRM-P5 Remote Verification (Fire OS 8 / Android 11)',
+                            style: TextStyle(color: bingeTextSecondary, fontSize: 16),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                     TvFocusable(
                       autofocus: true,
@@ -165,11 +171,15 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                         size: 22,
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        'WebView: $_webViewVersion',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white70,
+                      Expanded(
+                        child: Text(
+                          'WebView: $_webViewVersion',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -211,7 +221,7 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                         '${def['name']} ($code)',
                         style: TextStyle(
                           color: isReceived ? bingeYellow : Colors.white60,
-                          fontSize: 14,
+                          fontSize: 16,
                           fontWeight: isReceived
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -258,7 +268,7 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                                       '[${ev['time']}] ',
                                       style: const TextStyle(
                                         color: Colors.white38,
-                                        fontSize: 14,
+                                        fontSize: 16,
                                         fontFamily: 'monospace',
                                       ),
                                     ),
@@ -269,24 +279,27 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                                             ? bingeYellow
                                             : Colors.white60,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                    Text(
-                                      '${ev['keyName']} (code ${ev['keyCode']})',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
+                                    Expanded(
+                                      child: Text(
+                                        '${ev['keyName']} (code ${ev['keyCode']})',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const Spacer(),
                                     if (ev['repeat'] != null &&
                                         (ev['repeat'] as int) > 0)
                                       Text(
                                         'repeat=${ev['repeat']} ',
                                         style: const TextStyle(
                                           color: bingePurple,
-                                          fontSize: 13,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     if (ev['isLongPress'] == true)
@@ -305,7 +318,7 @@ class _RemoteTestScreenState extends State<RemoteTestScreen> {
                                           'LONG-PRESS',
                                           style: TextStyle(
                                             color: Colors.white,
-                                            fontSize: 11,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),

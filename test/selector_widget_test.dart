@@ -28,10 +28,30 @@ void main() {
       expect(find.text('Binge'), findsOneWidget);
       expect(find.text('BingeBang'), findsOneWidget);
       expect(find.text('Rivestream'), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Edit links'), findsOneWidget);
       expect(find.text('bingebang.st'), findsNothing);
       expect(find.text('rivestream.ru'), findsNothing);
       expect(find.text('Manage sites'), findsNothing);
+    });
+
+    testWidgets('profiles fit compact TV and mobile logical viewports', (
+      tester,
+    ) async {
+      for (final size in [const Size(640, 360), const Size(390, 844)]) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        for (final label in ['BingeBang', 'Rivestream', 'Edit links']) {
+          final rect = tester.getRect(find.text(label));
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(size.width));
+        }
+        expect(tester.takeException(), isNull);
+      }
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
     });
 
     testWidgets(
@@ -57,7 +77,7 @@ void main() {
       },
     );
 
-    testWidgets('OK / Select activates Settings and opens EditSitesScreen', (
+    testWidgets('OK / Select activates Edit links and opens EditSitesScreen', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(1920, 1080);
@@ -67,8 +87,8 @@ void main() {
       await tester.pumpWidget(buildTestApp());
       await tester.pumpAndSettle();
 
-      // Tap or focus Settings button
-      await tester.tap(find.text('Settings'));
+      // Tap or focus Edit links button
+      await tester.tap(find.text('Edit links'));
       await tester.pumpAndSettle();
 
       // Verify EditSitesScreen is opened

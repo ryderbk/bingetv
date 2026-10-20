@@ -14,9 +14,45 @@ const bingeDanger = Color(0xFFFF5C6C);
 const bingeDarkBg = bingeSurface;
 const bingeFieldBg = bingeRaised;
 const bingeDivider = Color(0xFF282C35);
-const bingeCardWidth = 300.0;
-const bingeCardHeight = 214.0;
+const bingeSpace1 = 4.0;
+const bingeSpace2 = 8.0;
+const bingeSpace3 = 12.0;
+const bingeSpace4 = 16.0;
+const bingeSpace5 = 24.0;
+const bingeSpace6 = 32.0;
+const bingeSpace7 = 48.0;
+const bingeRadiusSmall = 8.0;
+const bingeRadiusMedium = 12.0;
+const bingeRadiusLarge = 20.0;
 const bingePagePadding = 64.0;
+
+EdgeInsets bingePageInsets(double width, {double vertical = 32}) =>
+    EdgeInsets.symmetric(
+      horizontal: (width * 0.055).clamp(20.0, bingePagePadding).toDouble(),
+      vertical: vertical,
+    );
+
+const bingeScreenTitle = TextStyle(
+  color: bingeYellow,
+  fontSize: 36,
+  fontWeight: FontWeight.w800,
+  letterSpacing: -0.6,
+);
+const bingeSectionTitle = TextStyle(
+  color: Colors.white,
+  fontSize: 22,
+  fontWeight: FontWeight.w700,
+);
+const bingeBodyText = TextStyle(color: Colors.white, fontSize: 18);
+const bingeSecondaryText = TextStyle(
+  color: bingeTextSecondary,
+  fontSize: 16,
+);
+const bingeButtonText = TextStyle(
+  color: Colors.white,
+  fontSize: 18,
+  fontWeight: FontWeight.w600,
+);
 
 ThemeData buildBingeTheme() {
   final base = ThemeData.dark(useMaterial3: true);
@@ -38,13 +74,13 @@ ThemeData buildBingeTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: bingeFieldBg,
-      labelStyle: const TextStyle(color: Colors.white70, fontSize: 20),
+      labelStyle: const TextStyle(color: bingeTextSecondary, fontSize: 18),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(bingeRadiusMedium),
         borderSide: const BorderSide(color: bingeDivider, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(bingeRadiusMedium),
         borderSide: const BorderSide(color: bingeYellow, width: 2),
       ),
     ),

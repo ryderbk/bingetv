@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
@@ -112,43 +110,31 @@ class _TvFocusableState extends State<TvFocusable> {
                 curve: Curves.easeOutCubic,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(widget.borderRadius),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      curve: Curves.easeOutCubic,
-                      padding: widget.padding,
-                      decoration: BoxDecoration(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOutCubic,
+                    padding: widget.padding,
+                    decoration: BoxDecoration(
+                      color: _isFocused
+                          ? (widget.focusedBackgroundColor ??
+                                widget.backgroundColor)
+                          : widget.backgroundColor,
+                      borderRadius: BorderRadius.circular(widget.borderRadius),
+                      border: Border.all(
                         color: _isFocused
-                            ? (widget.focusedBackgroundColor ??
-                                  widget.backgroundColor)
-                            : widget.backgroundColor,
-                        borderRadius: BorderRadius.circular(
-                          widget.borderRadius,
-                        ),
-                        border: Border.all(
-                          color: _isFocused
-                              ? widget.focusedBorderColor
-                              : (widget.unfocusedBorderColor ==
-                                            Colors.transparent &&
-                                        widget.backgroundColor !=
-                                            Colors.transparent
-                                    ? bingeGlassBorder
-                                    : widget.unfocusedBorderColor),
-                          width: _isFocused ? widget.borderWidth + 1 : 1,
-                        ),
-                        boxShadow: _isFocused
-                            ? const [
-                                BoxShadow(
-                                  color: Colors.black54,
-                                  blurRadius: 18,
-                                  offset: Offset(0, 6),
-                                ),
-                              ]
-                            : null,
+                            ? widget.focusedBorderColor
+                            : (widget.unfocusedBorderColor ==
+                                          Colors.transparent &&
+                                      widget.backgroundColor !=
+                                          Colors.transparent
+                                  ? bingeGlassBorder
+                                  : widget.unfocusedBorderColor),
+                        width: _isFocused
+                            ? widget.borderWidth + 1
+                            : widget.borderWidth,
                       ),
-                      child: widget.builder(context, _isFocused),
                     ),
+                    child: widget.builder(context, _isFocused),
                   ),
                 ),
               ),

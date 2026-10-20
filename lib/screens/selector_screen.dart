@@ -228,58 +228,72 @@ class _SelectorScreenState extends State<SelectorScreen> {
         return KeyEventResult.ignored;
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: bingeBackground,
         body: SafeArea(
-          minimum: const EdgeInsets.symmetric(
-            horizontal: bingePagePadding,
-            vertical: 36,
-          ),
+          minimum: bingePageInsets(MediaQuery.sizeOf(context).width, vertical: 24),
           child: Column(
             children: [
-              const SizedBox(height: 14),
+              const SizedBox(height: bingeSpace4),
               const Text(
                 'Binge',
                 style: TextStyle(
                   color: bingeYellow,
-                  fontSize: 50,
+                  fontSize: 48,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -1,
                 ),
               ),
+              const SizedBox(height: bingeSpace2),
+              const Text('Choose a site', style: bingeSecondaryText),
               Expanded(
                 child: Center(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final gap = constraints.maxWidth >= 900 ? 64.0 : 28.0;
-                      final itemWidth = ((constraints.maxWidth - gap * 2) / 3)
-                          .clamp(150.0, 250.0);
-                      final profiles = [
-                        for (var i = 0; i < _sites.length; i++)
-                          _SiteCard(
-                            site: _sites[i],
-                            width: itemWidth,
-                            focusNode: i < _cardFocusNodes.length
-                                ? _cardFocusNodes[i]
-                                : null,
-                            onSelected: () => _openSite(_sites[i]),
-                            isLastOpened: _sites[i].url == _lastOpenedUrl,
-                          ),
-                        _EditProfile(
-                          width: itemWidth,
-                          focusNode: _editButtonFocusNode,
-                          onSelected: _openEditor,
-                        ),
-                      ];
+                      final profileCount = _sites.length + 1;
+                      const gap = 28.0;
+                      final maxColumns = profileCount.clamp(1, 4).toInt();
+                      final columns = ((constraints.maxWidth + gap) /
+                              (116 + gap))
+                          .floor()
+                          .clamp(1, maxColumns)
+                          .toInt();
+                      final maxItemWidth =
+                          (constraints.maxHeight - 72).clamp(116.0, 252.0);
+                      final itemWidth = ((constraints.maxWidth -
+                                  gap * (columns - 1)) /
+                              columns)
+                          .clamp(116.0, maxItemWidth)
+                          .toDouble();
                       return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (var i = 0; i < profiles.length; i++) ...[
-                              profiles[i],
-                              if (i < profiles.length - 1) SizedBox(width: gap),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            runAlignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: gap,
+                            runSpacing: bingeSpace6,
+                            children: [
+                              for (var i = 0; i < _sites.length; i++)
+                                _SiteCard(
+                                  site: _sites[i],
+                                  width: itemWidth,
+                                  focusNode: i < _cardFocusNodes.length
+                                      ? _cardFocusNodes[i]
+                                      : null,
+                                  onSelected: () => _openSite(_sites[i]),
+                                  isLastOpened:
+                                      _sites[i].url == _lastOpenedUrl,
+                                ),
+                              _EditProfile(
+                                width: itemWidth,
+                                focusNode: _editButtonFocusNode,
+                                onSelected: _openEditor,
+                              ),
                             ],
-                          ],
+                          ),
                         ),
                       );
                     },
@@ -334,20 +348,11 @@ class _SiteCard extends StatelessWidget {
                 height: avatarSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: focused ? const Color(0xFF30252A) : bingeSurface,
+                  color: focused ? bingeRaised : bingeSurface,
                   border: Border.all(
                     color: focused ? bingeYellow : bingeDivider,
                     width: focused ? 4 : 1,
                   ),
-                  boxShadow: focused
-                      ? const [
-                          BoxShadow(
-                            color: Color(0x55FFD600),
-                            blurRadius: 22,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                      : null,
                 ),
                 child: Center(
                   child: Text(
@@ -426,7 +431,7 @@ class _EditProfile extends StatelessWidget {
                 height: avatarSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: focused ? const Color(0xFF30252A) : bingeSurface,
+                  color: focused ? bingeRaised : bingeSurface,
                   border: Border.all(
                     color: focused ? bingeYellow : bingeDivider,
                     width: focused ? 4 : 1,
@@ -440,7 +445,7 @@ class _EditProfile extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Text(
-                'Settings',
+                'Edit links',
                 style: TextStyle(
                   color: focused ? bingeYellow : Colors.white,
                   fontSize: 22,
@@ -470,6 +475,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _hasUnsavedChanges = false;
   bool _openLastOnStart = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -530,8 +536,13 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
 
   Future<void> _save() async {
     for (var i = 0; i < _names.length; i++) {
-      if (_names[i].text.trim().isEmpty ||
-          _validateUrl(_urls[i].text) != null) {
+      if (_names[i].text.trim().isEmpty) {
+        setState(() => _saveError = 'Site ${i + 1}: enter a name.');
+        return;
+      }
+      final urlError = _validateUrl(_urls[i].text);
+      if (urlError != null) {
+        setState(() => _saveError = 'Site ${i + 1} URL: $urlError');
         return;
       }
     }
@@ -596,17 +607,20 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: bingeBackground,
         body: SafeArea(
-          minimum: const EdgeInsets.symmetric(
-            horizontal: bingePagePadding,
-            vertical: 32,
+          minimum: bingePageInsets(
+            MediaQuery.sizeOf(context).width,
+            vertical: 24,
           ),
           child: Form(
             key: _formKey,
             onChanged: () {
-              if (!_hasUnsavedChanges) {
-                setState(() => _hasUnsavedChanges = true);
+              if (!_hasUnsavedChanges || _saveError != null) {
+                setState(() {
+                  _hasUnsavedChanges = true;
+                  _saveError = null;
+                });
               }
             },
             child: ListView(
@@ -614,14 +628,7 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Settings',
-                      style: TextStyle(
-                        color: bingeYellow,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    const Text('Edit links', style: bingeScreenTitle),
                     TvFocusable(
                       onSelected: () {
                         Navigator.of(context).push(
@@ -716,8 +723,11 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     label: 'Name',
                     controller: _names[i],
                     onChanged: () {
-                      if (!_hasUnsavedChanges) {
-                        setState(() => _hasUnsavedChanges = true);
+                      if (!_hasUnsavedChanges || _saveError != null) {
+                        setState(() {
+                          _hasUnsavedChanges = true;
+                          _saveError = null;
+                        });
                       }
                     },
                     validator: (v) => v == null || v.trim().isEmpty
@@ -730,8 +740,11 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                     label: 'URL',
                     controller: _urls[i],
                     onChanged: () {
-                      if (!_hasUnsavedChanges) {
-                        setState(() => _hasUnsavedChanges = true);
+                      if (!_hasUnsavedChanges || _saveError != null) {
+                        setState(() {
+                          _hasUnsavedChanges = true;
+                          _saveError = null;
+                        });
                       }
                     },
                     keyboardType: TextInputType.url,
@@ -815,9 +828,9 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                               _openLastOnStart
                                   ? 'Enabled · resumes your most recent site'
                                   : 'Disabled · show the site selector on launch',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white60,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: bingeTextSecondary,
                               ),
                             ),
                           ],
@@ -828,6 +841,13 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                 ),
 
                 const SizedBox(height: 28),
+                if (_saveError != null) ...[
+                  Text(
+                    _saveError!,
+                    style: const TextStyle(color: bingeDanger, fontSize: 16),
+                  ),
+                  const SizedBox(height: bingeSpace3),
+                ],
 
                 // Action buttons: Save, Reset to defaults, Cancel
                 Wrap(

@@ -82,9 +82,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     return Scaffold(
       backgroundColor: bingeBackground,
       body: SafeArea(
-        minimum: const EdgeInsets.symmetric(
-          horizontal: bingePagePadding,
-          vertical: 36,
+        minimum: bingePageInsets(
+          MediaQuery.sizeOf(context).width,
+          vertical: 24,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,7 +119,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
+            Wrap(
+              spacing: bingeSpace3,
+              runSpacing: bingeSpace2,
               children: [
                 TvFocusable(
                   autofocus: true,
@@ -212,7 +214,9 @@ class ColourCheckScreen extends StatelessWidget {
                 for (final colour in colours)
                   Expanded(
                     child: Container(
-                      height: 180,
+                      height: (MediaQuery.sizeOf(context).height * 0.22)
+                          .clamp(72.0, 180.0)
+                          .toDouble(),
                       margin: const EdgeInsets.only(right: 12),
                       color: colour,
                     ),

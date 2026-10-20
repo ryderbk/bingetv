@@ -64,22 +64,27 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
         child: Container(
           color: Colors.black.withValues(alpha: 0.72),
           alignment: Alignment.centerRight,
-          child: Container(
-            width: 440,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: bingeSurface,
-              border: const Border(
-                left: BorderSide(color: bingeDivider, width: 1),
-              ),
-            ),
-            child: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 28,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final panelWidth = constraints.maxWidth < 600
+                  ? constraints.maxWidth
+                  : constraints.maxWidth.clamp(420.0, 560.0).toDouble();
+              return Container(
+                width: panelWidth,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  color: bingeSurface,
+                  border: const Border(
+                    left: BorderSide(color: bingeDivider, width: 1),
+                  ),
                 ),
-                children: [
+                child: SafeArea(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: panelWidth < 420 ? 20 : 28,
+                      vertical: 28,
+                    ),
+                    children: [
                   const Text(
                     'Quick Menu',
                     style: TextStyle(
@@ -91,7 +96,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                   const SizedBox(height: 6),
                   const Text(
                     'Press Back to resume',
-                    style: TextStyle(                    color: bingeTextSecondary, fontSize: 16),
+                    style: bingeSecondaryText,
                   ),
                   const SizedBox(height: 24),
 
@@ -99,7 +104,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade900.withValues(alpha: 0.3),
+                        color: bingeRaised,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: bingeYellow, width: 1),
                       ),
@@ -110,7 +115,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                             'Blocked Redirect:',
                             style: TextStyle(
                               color: bingeYellow,
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -118,7 +123,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                             widget.pendingBlockedRedirect!,
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontSize: 13,
+                              fontSize: 15,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -276,15 +281,17 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                           'WebView: ${widget.webViewVersion}',
                           style: const TextStyle(
                             color: Colors.white60,
-                            fontSize: 13,
+                            fontSize: 15,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -316,7 +323,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                     label,
                     style: TextStyle(
                       color: focused ? bingeYellow : Colors.white,
-                      fontSize: 18,
+                      fontSize: 19,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -325,7 +332,7 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                       subtitle,
                       style: const TextStyle(
                         color: Colors.white54,
-                        fontSize: 13,
+                        fontSize: 15,
                       ),
                     ),
                 ],
