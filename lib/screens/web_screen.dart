@@ -9,11 +9,13 @@ import '../services/site_store.dart';
 import '../services/redirect_policy.dart';
 import '../services/key_pipeline.dart';
 import '../services/load_state.dart';
+import '../services/navigation_history.dart';
 import '../theme.dart';
 import '../widgets/quick_menu_overlay.dart';
 import '../widgets/tv_focusable.dart';
 import 'remote_test_screen.dart';
 import 'diagnostics_screen.dart';
+import 'selector_screen.dart';
 
 class WebScreen extends StatefulWidget {
   const WebScreen({required this.site, super.key});
@@ -33,8 +35,6 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   int _progress = 0;
   final _loadTracker = WebLoadTracker();
   Timer? _watchdogTimer;
-  Timer? _serverRetryTimer;
-  bool _serverRetryAttempted = false;
   String? _error;
   int _blockedRequestCount = 0;
   bool _isOffline = false;
@@ -44,6 +44,7 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   bool _adBlockEnabled = true;
   String? _pendingBlockedRedirect;
   String? _allowedRedirectUrlOnce;
+  final _navigationHistory = NavigationHistory();
   String _webViewVersion = 'Detecting...';
   String _customUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -108,7 +109,6 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
     _keyPipeline.deactivateWebScreen();
     _overlayFocusNode.dispose();
     _watchdogTimer?.cancel();
-    _serverRetryTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -117,12 +117,14 @@ class _WebScreenState extends State<WebScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+      _navigationHistory.add('lifecycle', detail: state.name);
       // TV Home pressed or switched
       _controller?.evaluateJavascript(
         source: 'window.__bingeTv && window.__bingeTv.pauseMedia()',
       );
       _controller?.pause();
     } else if (state == AppLifecycleState.resumed) {
+      _navigationHistory.add('lifecycle', detail: state.name);
       _controller?.resume();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
@@ -219,7 +221,7 @@ $scriptContent
 
     // 2. Guide key -> return to selector
     if (action == 'Guide') {
-      Navigator.of(context).pop();
+      _returnToSelector();
       return;
     }
 
@@ -240,7 +242,7 @@ $scriptContent
     if (_error != null || _isOffline) {
       _keyPipeline.setMode(InputMode.webOverlay);
       if (action == 'Back') {
-        Navigator.of(context).pop();
+        _returnToSelector();
       }
       return;
     }
@@ -259,7 +261,7 @@ $scriptContent
 
   Future<void> _handleBackNavigation() async {
     if (_controller == null) {
-      Navigator.of(context).pop();
+      _returnToSelector();
       return;
     }
 
@@ -277,7 +279,15 @@ $scriptContent
     }
 
     // Return to site selector
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) _returnToSelector();
+  }
+
+  void _returnToSelector() {
+    if (!mounted) return;
+    _navigationHistory.add('return-to-selector');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const SelectorScreen()),
+    );
   }
 
   @override
@@ -326,11 +336,13 @@ $scriptContent
               initialUserScripts: _initialUserScripts,
               onWebViewCreated: (controller) {
                 _controller = controller;
+                _navigationHistory.add('webview-created');
                 _store.setLastOpenedSite(widget.site.url).catchError((error) {
                   debugPrint('Binge: failed to persist opened site: $error');
                 });
               },
               onLoadStart: (_, uri) {
+                _navigationHistory.add('load-start', url: uri?.toString());
                 _loadTracker.started();
                 setState(() {
                   _loading = true;
@@ -350,6 +362,7 @@ $scriptContent
                 });
               },
               onLoadStop: (controller, uri) async {
+                _navigationHistory.add('load-stop', url: uri?.toString());
                 // Fallback injection for frames and dynamic resets
                 try {
                   final script = await rootBundle.loadString(
@@ -365,14 +378,15 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
 ''',
                   );
                 } catch (error) {
-                  debugPrint('Binge: navigation script fallback failed: $error');
+                  debugPrint(
+                    'Binge: navigation script fallback failed: $error',
+                  );
                 }
                 if (mounted) {
                   setState(() {
                     _loading = false;
                     _loadTracker.interactive();
                     _progress = 100;
-                    _serverRetryAttempted = false;
                   });
                   await _keyPipeline.setMode(InputMode.webPage);
                 }
@@ -380,6 +394,11 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
               onReceivedError: (_, request, error) {
                 // Defect 3: Only main frame errors show the error overlay!
                 if (request.isForMainFrame ?? false) {
+                  _navigationHistory.add(
+                    'load-error',
+                    url: request.url.toString(),
+                    detail: error.description,
+                  );
                   setState(() {
                     _loading = false;
                     _error = error.description;
@@ -394,25 +413,18 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
               },
               onReceivedHttpError: (_, request, errorResponse) {
                 final statusCode = errorResponse.statusCode ?? 0;
+                if (request.isForMainFrame ?? false) {
+                  _navigationHistory.add(
+                    'http-error',
+                    url: request.url.toString(),
+                    statusCode: statusCode,
+                  );
+                }
                 if ((request.isForMainFrame ?? false) && statusCode >= 500) {
-                  if (!_serverRetryAttempted && _serverRetryTimer == null) {
-                    _serverRetryAttempted = true;
-                    _serverRetryTimer = Timer(const Duration(seconds: 2), () {
-                      _serverRetryTimer = null;
-                      if (!mounted) return;
-                      setState(() {
-                        _loading = true;
-                        _slowNotice = false;
-                        _error = null;
-                      });
-                      _controller?.reload();
-                    });
-                    return;
-                  }
                   setState(() {
                     _loading = false;
                     _error =
-                        'Server returned error status $statusCode after a retry.';
+                        'Server returned error status $statusCode. Press Retry to try again.';
                   });
                   _overlayFocusNode.requestFocus();
                   _keyPipeline.setMode(InputMode.webOverlay);
@@ -545,7 +557,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                   _keyPipeline.setMode(InputMode.webPage);
                   _controller?.reload();
                 },
-                onHome: () => Navigator.of(context).pop(),
+                onHome: _returnToSelector,
                 isCursorMode: _isCursorMode,
                 onToggleCursorMode: () {
                   setState(() => _isCursorMode = !_isCursorMode);
@@ -567,7 +579,10 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                 onToggleAdBlock: (val) async {
                   setState(() => _adBlockEnabled = val);
                   await _store.setAdBlockEnabled(val);
-                  _controller?.reload();
+                  _navigationHistory.add(
+                    'ad-block-changed',
+                    detail: val ? 'enabled' : 'disabled',
+                  );
                 },
                 pendingBlockedRedirect: _pendingBlockedRedirect,
                 onAllowRedirectOnce: () {
@@ -608,6 +623,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                             lastError: _error,
                             blockedRequestCount: _blockedRequestCount,
                             ruleCount: _contentBlockers.length,
+                            navigationEvents: _navigationHistory.events,
                           ),
                         ),
                       )
@@ -679,7 +695,7 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                   ),
                 ),
                 TvFocusable(
-                  onSelected: () => Navigator.of(context).pop(),
+                  onSelected: _returnToSelector,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 28,
                     vertical: 14,

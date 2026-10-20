@@ -149,18 +149,19 @@
       'padding: 0'
     ].join(' !important;') + ' !important;';
 
-    // The website supplies its own focus/selection treatment. Binge keeps
-    // spatial navigation and cursor mode, but does not draw a second ring.
+    // Keep the website's own focus treatment, with a restrained fallback ring
+    // so remote navigation remains visible on sites that hide native focus.
     focusRingElement = document.createElement('div');
     focusRingElement.id = '__binge_tv_focus_ring';
     focusRingElement.style.cssText = [
       'position: fixed',
-      'display: none !important',
+      'display: none',
       'box-sizing: border-box',
-      'border: 4px solid ' + COLOR_YELLOW,
+      'border: 2px solid rgba(205, 170, 255, 0.92)',
       'border-radius: 8px',
-      'box-shadow: 0 0 16px ' + COLOR_PURPLE + ', 0 0 32px ' + COLOR_DEEP_PURPLE,
-      'transition: top 80ms ease-out, left 80ms ease-out, width 80ms ease-out, height 80ms ease-out, opacity 100ms ease',
+      'background: rgba(124, 58, 237, 0.07)',
+      'box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 12px rgba(124, 58, 237, 0.32)',
+      'transition: top 100ms ease-out, left 100ms ease-out, width 100ms ease-out, height 100ms ease-out, opacity 100ms ease',
       'pointer-events: none',
       'z-index: 2147483641'
     ].join(' !important;') + ' !important;';
@@ -191,17 +192,14 @@
 
   function updateFocusRing() {
     ensureOverlayContainer();
-    if (focusRingElement) focusRingElement.style.display = 'none';
-    return;
-    /*
     if (cursorMode || !currentFocusedElement || !document.contains(currentFocusedElement)) {
-      if (focusRingElement) focusRingElement.style.display = 'none';
+      if (focusRingElement) focusRingElement.style.setProperty('display', 'none', 'important');
       return;
     }
 
     const rect = currentFocusedElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0 || rect.bottom < 0 || rect.top > window.innerHeight) {
-      if (focusRingElement) focusRingElement.style.display = 'none';
+      if (focusRingElement) focusRingElement.style.setProperty('display', 'none', 'important');
       return;
     }
 
@@ -213,13 +211,13 @@
     } catch (e) {}
 
     const offset = 4;
-    focusRingElement.style.display = 'block';
+    focusRingElement.style.setProperty('display', 'block', 'important');
     focusRingElement.style.left = (rect.left - offset) + 'px';
     focusRingElement.style.top = (rect.top - offset) + 'px';
     focusRingElement.style.width = (rect.width + offset * 2) + 'px';
     focusRingElement.style.height = (rect.height + offset * 2) + 'px';
     focusRingElement.style.borderRadius = radius;
-    */
+    focusRingElement.style.setProperty('display', 'block', 'important');
   }
 
   function updateCursorPosition(x, y) {
@@ -1212,7 +1210,7 @@
       cursorX = window.innerWidth / 2;
       cursorY = window.innerHeight / 2;
       updateCursorPosition(cursorX, cursorY);
-      if (focusRingElement) focusRingElement.style.display = 'none';
+      if (focusRingElement) focusRingElement.style.setProperty('display', 'none', 'important');
       showToast('Cursor Mode', 1800);
     } else {
       if (cursorPointerElement) cursorPointerElement.style.display = 'none';

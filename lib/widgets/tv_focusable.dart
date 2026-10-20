@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
@@ -17,7 +19,7 @@ class TvFocusable extends StatefulWidget {
     this.unfocusedBorderColor = Colors.transparent,
     this.borderWidth = 1,
     this.padding,
-    this.backgroundColor = bingeDarkBg,
+    this.backgroundColor = bingeGlassSurface,
     this.focusedBackgroundColor,
   });
 
@@ -43,6 +45,14 @@ class TvFocusable extends StatefulWidget {
 class _TvFocusableState extends State<TvFocusable> {
   bool _isFocused = false;
   bool _pressed = false;
+
+  @override
+  void didUpdateWidget(covariant TvFocusable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      _isFocused = widget.focusNode?.hasFocus ?? false;
+    }
+  }
 
   static final Map<ShortcutActivator, Intent> _tvShortcuts = {
     const SingleActivator(LogicalKeyboardKey.select): const ActivateIntent(),
@@ -100,33 +110,46 @@ class _TvFocusableState extends State<TvFocusable> {
                     : 1.0,
                 duration: const Duration(milliseconds: 150),
                 curve: Curves.easeOutCubic,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOutCubic,
-                  padding: widget.padding,
-                  decoration: BoxDecoration(
-                    color: _isFocused
-                        ? (widget.focusedBackgroundColor ??
-                              widget.backgroundColor)
-                        : widget.backgroundColor,
-                    borderRadius: BorderRadius.circular(widget.borderRadius),
-                    border: Border.all(
-                      color: _isFocused
-                          ? widget.focusedBorderColor
-                          : widget.unfocusedBorderColor,
-                      width: _isFocused ? widget.borderWidth + 1 : 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.borderRadius),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOutCubic,
+                      padding: widget.padding,
+                      decoration: BoxDecoration(
+                        color: _isFocused
+                            ? (widget.focusedBackgroundColor ??
+                                  widget.backgroundColor)
+                            : widget.backgroundColor,
+                        borderRadius: BorderRadius.circular(
+                          widget.borderRadius,
+                        ),
+                        border: Border.all(
+                          color: _isFocused
+                              ? widget.focusedBorderColor
+                              : (widget.unfocusedBorderColor ==
+                                            Colors.transparent &&
+                                        widget.backgroundColor !=
+                                            Colors.transparent
+                                    ? bingeGlassBorder
+                                    : widget.unfocusedBorderColor),
+                          width: _isFocused ? widget.borderWidth + 1 : 1,
+                        ),
+                        boxShadow: _isFocused
+                            ? const [
+                                BoxShadow(
+                                  color: Colors.black54,
+                                  blurRadius: 18,
+                                  offset: Offset(0, 6),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: widget.builder(context, _isFocused),
                     ),
-                    boxShadow: _isFocused
-                        ? const [
-                            BoxShadow(
-                              color: Colors.black54,
-                              blurRadius: 18,
-                              offset: Offset(0, 6),
-                            ),
-                          ]
-                        : null,
                   ),
-                  child: widget.builder(context, _isFocused),
                 ),
               ),
             ),

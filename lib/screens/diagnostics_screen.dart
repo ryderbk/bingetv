@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../theme.dart';
+import '../services/navigation_history.dart';
 import '../widgets/tv_focusable.dart';
 
 class DiagnosticsScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class DiagnosticsScreen extends StatefulWidget {
     required this.lastError,
     required this.blockedRequestCount,
     required this.ruleCount,
+    this.navigationEvents = const [],
     super.key,
   });
 
@@ -18,6 +20,7 @@ class DiagnosticsScreen extends StatefulWidget {
   final String? lastError;
   final int blockedRequestCount;
   final int ruleCount;
+  final List<NavigationEvent> navigationEvents;
 
   @override
   State<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
@@ -57,6 +60,11 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       'Content-blocker rules: ${widget.ruleCount}',
       'Key pipeline: native interception channel enabled',
       'Viewport: WebView reports at runtime; desktop width is site-configured',
+      if (widget.navigationEvents.isNotEmpty) ...[
+        '',
+        'Recent navigation events:',
+        ...widget.navigationEvents.map((event) => event.toString()),
+      ],
     ].join('\n');
   }
 

@@ -34,6 +34,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
   void initState() {
     super.initState();
     KeyPipeline.instance.setMode(InputMode.selector);
+    FocusManager.instance.addListener(_recoverSelectorFocus);
     _loadDataAndCheckAutoOpen();
   }
 
@@ -44,7 +45,14 @@ class _SelectorScreenState extends State<SelectorScreen> {
     }
     _editButtonFocusNode.dispose();
     _loadTimeoutTimer?.cancel();
+    FocusManager.instance.removeListener(_recoverSelectorFocus);
     super.dispose();
+  }
+
+  void _recoverSelectorFocus() {
+    if (!mounted || _loading || _sites.isEmpty) return;
+    if (FocusManager.instance.primaryFocus != null) return;
+    _restoreInitialFocus();
   }
 
   Future<void> _loadDataAndCheckAutoOpen() async {
@@ -153,9 +161,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
       }),
     );
     try {
-      await Navigator.of(
-        context,
-      ).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) =>
               widget.webScreenBuilder?.call(site) ?? WebScreen(site: site),
@@ -271,8 +277,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
                           children: [
                             for (var i = 0; i < profiles.length; i++) ...[
                               profiles[i],
-                              if (i < profiles.length - 1)
-                                SizedBox(width: gap),
+                              if (i < profiles.length - 1) SizedBox(width: gap),
                             ],
                           ],
                         ),
@@ -776,7 +781,10 @@ class _EditSitesScreenState extends State<EditSitesScreen> {
                       _hasUnsavedChanges = true;
                     });
                   },
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 16,
+                  ),
                   backgroundColor: bingeSurface,
                   borderRadius: 12,
                   builder: (ctx, focused) => Row(
