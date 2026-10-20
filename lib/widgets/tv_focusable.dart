@@ -120,21 +120,29 @@ class _TvFocusableState extends State<TvFocusable> {
                                 widget.backgroundColor)
                           : widget.backgroundColor,
                       borderRadius: BorderRadius.circular(widget.borderRadius),
-                      border: Border.all(
-                        color: _isFocused
-                            ? widget.focusedBorderColor
-                            : (widget.unfocusedBorderColor ==
-                                          Colors.transparent &&
-                                      widget.backgroundColor !=
-                                          Colors.transparent
-                                  ? bingeGlassBorder
-                                  : widget.unfocusedBorderColor),
-                        width: _isFocused
-                            ? widget.borderWidth + 1
-                            : widget.borderWidth,
-                      ),
                     ),
-                    child: widget.builder(context, _isFocused),
+                    child: DecoratedBox(
+                      position: DecorationPosition.foreground,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                          widget.borderRadius,
+                        ),
+                        border: Border.all(
+                          color: _isFocused
+                              ? widget.focusedBorderColor
+                              : (widget.unfocusedBorderColor ==
+                                            Colors.transparent &&
+                                        widget.backgroundColor !=
+                                            Colors.transparent
+                                    ? bingeGlassBorder
+                                    : widget.unfocusedBorderColor),
+                          width: _isFocused
+                              ? widget.borderWidth + 1
+                              : widget.borderWidth,
+                        ),
+                      ),
+                      child: widget.builder(context, _isFocused),
+                    ),
                   ),
                 ),
               ),
