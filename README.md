@@ -62,7 +62,7 @@ and launches Binge.
 | --- | --- |
 | D-pad / OK | Move focus / activate |
 | Back | Close overlay, WebView history, or return to sites |
-| Menu | Open the Quick Menu |
+| Menu | Edit selected site / open Quick Menu |
 | Guide | Return to the site selector |
 | Red | Toggle cursor mode |
 | Blue | Reload the current page |
@@ -72,8 +72,8 @@ and launches Binge.
 | Info / Subtitle | Site navigation actions |
 | 0-9 | Number shortcuts |
 
-Home, Voice, Power, volume and shortcut keys are handled by Fire OS and are
-not delivered to the application.
+Home, Voice, Power and volume buttons are handled by Fire OS and are not
+delivered to the application.
 
 ## Links, safe mode and diagnostics
 
