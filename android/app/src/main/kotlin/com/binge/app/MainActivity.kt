@@ -19,13 +19,15 @@ class MainActivity : FlutterActivity() {
     private var webScreenActive = false
     private var nativeInterceptEnabled = false
     private var lastInterceptHeartbeat = 0L
-    private var remoteTestActive = false
 
     // Long press tracking for remote keys (especially DPAD_CENTER / OK)
     private val handler = Handler(Looper.getMainLooper())
     private val pendingLongPressRunnables = mutableMapOf<Int, Runnable>()
     private val longPressTriggered = mutableSetOf<Int>()
     private val interceptedDownKeys = mutableSetOf<Int>()
+    private val repeatableActions = setOf(
+        "Up", "Down", "Left", "Right", "ChannelUp", "ChannelDown", "Rewind", "FastForward"
+    )
 
     // Data-driven remote map: KeyCode -> Action identifier
     private val remoteKeyMap = mutableMapOf<Int, String>(
@@ -89,10 +91,6 @@ class MainActivity : FlutterActivity() {
                         lastInterceptHeartbeat = System.currentTimeMillis()
                         result.success(true)
                     }
-                    "setRemoteTestActive" -> {
-                        remoteTestActive = call.argument<Boolean>("active") ?: false
-                        result.success(true)
-                    }
                     "remapKey" -> {
                         val keyCode = call.argument<Int>("keyCode")
                         val action = call.argument<String>("action")
@@ -134,20 +132,6 @@ class MainActivity : FlutterActivity() {
             Log.d(TAG, "dispatchKeyEvent: code=$keyCode ($keyName) down repeat=$repeat longPress=${event.isLongPress}")
         }
 
-        // Notify Remote Test screen if active (for diagnostics)
-        if (remoteTestActive) {
-            val payload = mapOf(
-                "keyCode" to keyCode,
-                "keyName" to keyName,
-                "action" to (if (isDown) "DOWN" else "UP"),
-                "repeat" to repeat,
-                "isLongPress" to event.isLongPress
-            )
-            runOnUiThread {
-                methodChannel?.invokeMethod("onTestKeyEvent", payload)
-            }
-        }
-
         // If web screen is active, intercept remote keys to prevent WebView / OS eating them
         val heartbeatFresh = System.currentTimeMillis() - lastInterceptHeartbeat < 2500L
         if (webScreenActive && nativeInterceptEnabled && heartbeatFresh) {
@@ -167,9 +151,11 @@ class MainActivity : FlutterActivity() {
                         pendingLongPressRunnables[keyCode] = runnable
                         handler.postDelayed(runnable, 600)
                     } else if (repeat > 0) {
-                        // Key repeat (e.g. holding D-pad arrow or rewind/FF)
+                        // Held Select is reserved for the long-press gesture.
                         interceptedDownKeys.add(keyCode)
-                        sendKeyToFlutter(actionName, repeat = repeat, isLongPress = false, keyCode = keyCode)
+                        if (actionName in repeatableActions) {
+                            sendKeyToFlutter(actionName, repeat = repeat, isLongPress = false, keyCode = keyCode)
+                        }
                     } else {
                         // First key down for other keys (or repeated)
                         interceptedDownKeys.add(keyCode)
@@ -179,8 +165,11 @@ class MainActivity : FlutterActivity() {
                 } else if (event.action == KeyEvent.ACTION_UP) {
                     if (interceptedDownKeys.remove(keyCode)) {
                         pendingLongPressRunnables.remove(keyCode)?.let { handler.removeCallbacks(it) }
-                        if (!longPressTriggered.remove(keyCode)) {
-                            // Normal single click release
+                        val wasLongPress = longPressTriggered.remove(keyCode)
+                        if (!wasLongPress &&
+                            actionName == "Select" &&
+                            (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+                        ) {
                             sendKeyToFlutter(actionName, repeat = 0, isLongPress = false, keyCode = keyCode)
                         }
                         return true

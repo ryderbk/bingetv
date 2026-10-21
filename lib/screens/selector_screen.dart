@@ -7,7 +7,6 @@ import '../services/key_pipeline.dart';
 import '../services/url_normalizer.dart';
 import '../theme.dart';
 import '../widgets/tv_focusable.dart';
-import 'remote_test_screen.dart';
 import 'web_screen.dart';
 import '../widgets/tv_text_field.dart';
 
@@ -27,7 +26,6 @@ class _SelectorScreenState extends State<SelectorScreen> {
   String? _lastOpenedUrl;
   bool _openingSite = false;
   final List<FocusNode> _cardFocusNodes = [];
-  final _editButtonFocusNode = FocusNode();
   Timer? _loadTimeoutTimer;
 
   @override
@@ -43,7 +41,6 @@ class _SelectorScreenState extends State<SelectorScreen> {
     for (final node in _cardFocusNodes) {
       node.dispose();
     }
-    _editButtonFocusNode.dispose();
     _loadTimeoutTimer?.cancel();
     FocusManager.instance.removeListener(_recoverSelectorFocus);
     super.dispose();
@@ -61,7 +58,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
     var openLastOnStart = false;
     try {
       final result = await _loadPreferencesWithTimeout();
-      sites = result[0] as List<Site>;
+      sites = (result[0] as List<Site>).take(2).toList();
       lastUrl = result[1] as String?;
       openLastOnStart = result[2] as bool;
     } catch (_) {
@@ -71,42 +68,33 @@ class _SelectorScreenState extends State<SelectorScreen> {
     if (!mounted) return;
 
     _syncCardFocusNodes(sites);
-
     setState(() {
       _sites = sites;
       _lastOpenedUrl = lastUrl;
       _loading = false;
     });
-
-    // Check if auto-open is enabled and valid
     if (openLastOnStart &&
         lastUrl != null &&
-        sites.any((s) => s.url == lastUrl)) {
-      final targetSite = sites.firstWhere((s) => s.url == lastUrl);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _openSite(targetSite);
-      });
-      return;
+        sites.any((site) => site.url == lastUrl)) {
+      _openSite(sites.firstWhere((site) => site.url == lastUrl));
+    } else {
+      _restoreInitialFocus();
     }
-
-    _restoreInitialFocus();
   }
 
   void _syncCardFocusNodes(List<Site> sites) {
-    final oldById = <String, FocusNode>{
-      for (var i = 0; i < _sites.length; i++) _sites[i].id: _cardFocusNodes[i],
-    };
-    for (final site in _sites) {
-      if (!sites.any((candidate) => candidate.id == site.id)) {
-        oldById[site.id]?.dispose();
-      }
+    final oldNodes = List<FocusNode>.of(_cardFocusNodes);
+    for (var i = sites.length; i < oldNodes.length; i++) {
+      oldNodes[i].dispose();
     }
     _cardFocusNodes
       ..clear()
       ..addAll(
-        sites.map(
-          (site) =>
-              oldById[site.id] ?? FocusNode(debugLabel: 'site-${site.id}'),
+        List.generate(
+          sites.length,
+          (index) => index < oldNodes.length
+              ? oldNodes[index]
+              : FocusNode(debugLabel: 'site-$index'),
         ),
       );
   }
@@ -124,7 +112,10 @@ class _SelectorScreenState extends State<SelectorScreen> {
       _store.load(),
       _store.getLastOpenedSite(),
       _store.getOpenLastOnStart(),
-    ]).then(finish, onError: (_) => finish([SiteStore.defaults, null, false]));
+    ]).then(
+      finish,
+      onError: (_) => finish([SiteStore.defaults, null, false]),
+    );
     _loadTimeoutTimer = Timer(
       const Duration(seconds: 3),
       () => finish([SiteStore.defaults, null, false]),
@@ -146,14 +137,139 @@ class _SelectorScreenState extends State<SelectorScreen> {
     });
   }
 
-  void _dismissHintRow() {
-    // Kept as a no-op for the shared activation path.
+  String? _validateUrl(String? value) {
+    if (value == null || value.trim().isEmpty) return 'URL is required';
+    if (!UrlNormalizer.isValid(value)) {
+      return 'Enter a valid website address.';
+    }
+    return null;
+  }
+
+  int _focusedSiteIndex() {
+    final index = _cardFocusNodes.indexWhere((node) => node.hasFocus);
+    return index < 0 ? 0 : index;
+  }
+
+  Future<void> _editFocusedSite() async {
+    if (_sites.isEmpty) return;
+    final index = _focusedSiteIndex();
+    final site = _sites[index];
+    final nameController = TextEditingController(text: site.name);
+    final urlController = TextEditingController(text: site.url);
+    String? error;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Edit ${site.name}', style: bingeScreenTitle),
+          content: SizedBox(
+            width: (MediaQuery.sizeOf(dialogContext).width * 0.8)
+                .clamp(280.0, 560.0)
+                .toDouble(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TvTextField(
+                  label: 'Website name',
+                  controller: nameController,
+                  onChanged: () => setDialogState(() => error = null),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Name is required'
+                      : null,
+                ),
+                const SizedBox(height: bingeSpace4),
+                TvTextField(
+                  label: 'Website URL',
+                  controller: urlController,
+                  keyboardType: TextInputType.url,
+                  onChanged: () => setDialogState(() => error = null),
+                  validator: _validateUrl,
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: bingeSpace3),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      error!,
+                      style: const TextStyle(color: bingeDanger, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TvFocusable(
+              autofocus: true,
+              onSelected: () {
+                final normalizedUrl = UrlNormalizer.normalize(urlController.text);
+                if (nameController.text.trim().isEmpty || normalizedUrl == null) {
+                  setDialogState(() {
+                    error = nameController.text.trim().isEmpty
+                        ? 'Enter a website name.'
+                        : 'Enter a valid website URL.';
+                  });
+                  return;
+                }
+                Navigator.of(dialogContext).pop(true);
+              },
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              builder: (_, focused) => Text(
+                'Save',
+                style: TextStyle(
+                  color: focused ? bingeYellow : Colors.white,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+            TvFocusable(
+              onSelected: () => Navigator.of(dialogContext).pop(false),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              builder: (_, focused) => Text(
+                'Cancel',
+                style: TextStyle(
+                  color: focused ? bingeYellow : bingeTextSecondary,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true) {
+      final normalizedUrl = UrlNormalizer.normalize(urlController.text)!;
+      final updatedSite = site.copyWith(
+        name: nameController.text.trim(),
+        url: normalizedUrl,
+      );
+      final storedSites = await _store.load();
+      final allUpdatedSites = storedSites
+          .map((stored) => stored.url == site.url ? updatedSite : stored)
+          .toList();
+      final updatedSites = List<Site>.of(_sites)..[index] = updatedSite;
+      await _store.save(allUpdatedSites);
+      if (_lastOpenedUrl == site.url) {
+        await _store.setLastOpenedSite(normalizedUrl);
+      }
+      if (mounted) {
+        setState(() {
+          _sites = updatedSites;
+          if (_lastOpenedUrl == site.url) _lastOpenedUrl = normalizedUrl;
+        });
+      }
+    }
+
+    nameController.dispose();
+    urlController.dispose();
+    if (mounted) _cardFocusNodes[index].requestFocus();
   }
 
   Future<void> _openSite(Site site) async {
     if (_openingSite) return;
     setState(() => _openingSite = true);
-    _dismissHintRow();
     unawaited(
       _store.setLastOpenedSite(site.url).catchError((error, stackTrace) {
         debugPrint('Binge: failed to save last opened site: $error');
@@ -179,7 +295,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
         _store.load(),
       ]).timeout(const Duration(seconds: 3));
       updatedLastUrl = result[0] as String?;
-      updatedSites = result[1] as List<Site>;
+      updatedSites = (result[1] as List<Site>).take(2).toList();
     } catch (_) {}
     if (mounted) {
       _syncCardFocusNodes(updatedSites);
@@ -191,25 +307,6 @@ class _SelectorScreenState extends State<SelectorScreen> {
     }
   }
 
-  Future<void> _openEditor() async {
-    _dismissHintRow();
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EditSitesScreen(sites: _sites, store: _store),
-      ),
-    );
-    List<Site> sites = _sites;
-    try {
-      sites = await _store.load().timeout(const Duration(seconds: 3));
-    } catch (_) {}
-    if (mounted) {
-      _syncCardFocusNodes(sites);
-      setState(() {
-        _sites = sites;
-      });
-      _restoreInitialFocus();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -222,8 +319,10 @@ class _SelectorScreenState extends State<SelectorScreen> {
 
     return Focus(
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          _dismissHintRow();
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.contextMenu) {
+          _editFocusedSite();
+          return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
@@ -249,7 +348,7 @@ class _SelectorScreenState extends State<SelectorScreen> {
                 child: Center(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final profileCount = _sites.length + 1;
+                      final profileCount = _sites.length;
                       const gap = 28.0;
                       final maxColumns = profileCount.clamp(1, 4).toInt();
                       final columns = ((constraints.maxWidth + gap) /
@@ -287,11 +386,6 @@ class _SelectorScreenState extends State<SelectorScreen> {
                                   isLastOpened:
                                       _sites[i].url == _lastOpenedUrl,
                                 ),
-                              _EditProfile(
-                                width: itemWidth,
-                                focusNode: _editButtonFocusNode,
-                                onSelected: _openEditor,
-                              ),
                             ],
                           ),
                         ),
@@ -343,7 +437,8 @@ class _SiteCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
+                duration: const Duration(milliseconds: 100),
+                curve: Curves.easeOutCubic,
                 width: avatarSize,
                 height: avatarSize,
                 decoration: BoxDecoration(
@@ -351,7 +446,7 @@ class _SiteCard extends StatelessWidget {
                   color: focused ? bingeRaised : bingeSurface,
                   border: Border.all(
                     color: focused ? bingeYellow : bingeDivider,
-                    width: focused ? 4 : 1,
+                    width: focused ? 3 : 1,
                   ),
                 ),
                 child: Center(
@@ -388,70 +483,6 @@ class _SiteCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _EditProfile extends StatelessWidget {
-  const _EditProfile({
-    required this.width,
-    required this.focusNode,
-    required this.onSelected,
-  });
-
-  final double width;
-  final FocusNode focusNode;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return TvFocusable(
-      focusNode: focusNode,
-      onSelected: onSelected,
-      borderRadius: width,
-      scaleOnFocus: false,
-      backgroundColor: Colors.transparent,
-      focusedBorderColor: Colors.transparent,
-      unfocusedBorderColor: Colors.transparent,
-      borderWidth: 0,
-      builder: (_, focused) {
-        final avatarSize = width * 0.62;
-        return SizedBox(
-          width: width,
-          height: width + 72,
-          child: Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: avatarSize,
-                height: avatarSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: focused ? bingeRaised : bingeSurface,
-                  border: Border.all(
-                    color: focused ? bingeYellow : bingeDivider,
-                    width: focused ? 4 : 1,
-                  ),
-                ),
-                child: Icon(
-                  Icons.tune_rounded,
-                  color: focused ? bingeYellow : bingeTextSecondary,
-                  size: avatarSize * 0.34,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Edit links',
-                style: TextStyle(
-                  color: focused ? bingeYellow : Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ],
           ),
         );

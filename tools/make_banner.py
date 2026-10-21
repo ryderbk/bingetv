@@ -30,6 +30,20 @@ def fit_source(path, size):
     )
     return canvas
 
+def fit_banner(path, size):
+    """Fit banner artwork inside an opaque 16:9 canvas without distortion."""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f'Required brand asset is missing: {path}')
+    source = Image.open(path).convert('RGBA')
+    source.thumbnail(size, Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', size, COLOR_BLACK)
+    canvas.alpha_composite(
+        source,
+        ((size[0] - source.width) // 2, (size[1] - source.height) // 2),
+    )
+    return canvas.convert('RGB')
+
+
 def draw_purple_glow(canvas, center_x, center_y, rx, ry, max_alpha=170):
     """Draws an elliptical radial purple glow behind the text."""
     glow_layer = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
@@ -167,7 +181,7 @@ def main():
         dir_path = os.path.join(RES_DIR, folder)
         os.makedirs(dir_path, exist_ok=True)
         out_path = os.path.join(dir_path, 'tv_banner.png')
-        resized = fit_source(SOURCE_BANNER, dims)
+        resized = fit_banner(SOURCE_BANNER, dims)
         resized.save(out_path, format='PNG', optimize=True)
         print(f" -> Saved {out_path} ({dims[0]}x{dims[1]})")
 

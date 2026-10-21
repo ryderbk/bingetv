@@ -7,7 +7,6 @@ enum InputMode {
   webPage,
   webOverlay,
   diagnostics,
-  remoteTest,
   editingText,
 }
 
@@ -38,9 +37,6 @@ class KeyPipeline {
 
   Future<void> setMode(InputMode mode) async {
     _mode = mode;
-    await _channel.invokeMethod('setRemoteTestActive', {
-      'active': mode == InputMode.remoteTest,
-    });
     final enabled = shouldEnableNativeInterception(mode);
     if (enabled == _nativeEnabled) return;
     _nativeEnabled = enabled;
@@ -70,7 +66,7 @@ class KeyPipeline {
   }
 
   Future<void> _handleNativeCall(MethodCall call) async {
-    if (call.method == 'onRemoteKey' || call.method == 'onTestKeyEvent') {
+    if (call.method == 'onRemoteKey') {
       final event = Map<String, dynamic>.from(call.arguments as Map);
       for (final listener in List.of(_listeners)) {
         listener(event);

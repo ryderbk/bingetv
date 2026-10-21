@@ -29,13 +29,12 @@
   const COLOR_BG_DARK = 'rgba(13, 10, 18, 0.95)';
 
   const CANDIDATE_CACHE_TTL_MS = 250;
-  const KEY_THROTTLE_MS = 65;
+  const CHANNEL_REPEAT_INTERVAL_MS = 160;
   const CURSOR_MIN_SPEED = 8;
   const CURSOR_MAX_SPEED = 55;
   const CURSOR_ACCEL_TIME_MS = 500;
   const CURSOR_IDLE_TIMEOUT_MS = 5000;
   const VIEWPORT_MARGIN_PX = 150;
-  const SAFE_MARGIN_RATIO = 0.08; // 8% safe screen border for TV
 
   /* =========================================================================
    * STATE
@@ -44,7 +43,7 @@
   let lastDirectionHistory = {}; // e.g. { 'Right': el, 'Left': el }
   let cachedCandidates = null;
   let lastCandidatesTime = 0;
-  let lastKeyProcessedTime = 0;
+  let lastChannelScrollTime = 0;
 
   // Cursor Mode State
   let cursorMode = false;
@@ -157,11 +156,10 @@
       'position: fixed',
       'display: none',
       'box-sizing: border-box',
-      'border: 2px solid rgba(205, 170, 255, 0.92)',
+      'border: 3px solid ' + COLOR_YELLOW,
       'border-radius: 8px',
-      'background: rgba(124, 58, 237, 0.07)',
-      'box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 12px rgba(124, 58, 237, 0.32)',
-      'transition: top 100ms ease-out, left 100ms ease-out, width 100ms ease-out, height 100ms ease-out, opacity 100ms ease',
+      'background: transparent',
+      'transition: top 70ms ease-out, left 70ms ease-out, width 70ms ease-out, height 70ms ease-out, opacity 70ms ease',
       'pointer-events: none',
       'z-index: 2147483641'
     ].join(' !important;') + ' !important;';
@@ -210,12 +208,11 @@
       radius = computed.borderRadius || '8px';
     } catch (e) {}
 
-    const offset = 4;
     focusRingElement.style.setProperty('display', 'block', 'important');
-    focusRingElement.style.left = (rect.left - offset) + 'px';
-    focusRingElement.style.top = (rect.top - offset) + 'px';
-    focusRingElement.style.width = (rect.width + offset * 2) + 'px';
-    focusRingElement.style.height = (rect.height + offset * 2) + 'px';
+    focusRingElement.style.left = rect.left + 'px';
+    focusRingElement.style.top = rect.top + 'px';
+    focusRingElement.style.width = rect.width + 'px';
+    focusRingElement.style.height = rect.height + 'px';
     focusRingElement.style.borderRadius = radius;
     focusRingElement.style.setProperty('display', 'block', 'important');
   }
@@ -510,8 +507,7 @@
     // Trigger hover events to reveal auto-hiding video controls or dropdowns
     dispatchHoverSequence(el);
 
-    // Scroll into view if outside the safe area
-    ensureElementInSafeArea(el, scrollOptions);
+    centerFocusedElement(el, scrollOptions);
 
     updateFocusRing();
 
@@ -534,28 +530,16 @@
     } catch (e) {}
   }
 
-  function ensureElementInSafeArea(el, options) {
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const marginY = window.innerHeight * SAFE_MARGIN_RATIO;
-    const marginX = window.innerWidth * SAFE_MARGIN_RATIO;
-
-    const isOutside =
-      rect.top < marginY ||
-      rect.bottom > window.innerHeight - marginY ||
-      rect.left < marginX ||
-      rect.right > window.innerWidth - marginX;
-
-    if (isOutside) {
-      try {
-        el.scrollIntoView({
-          behavior: (options && options.smooth) ? 'smooth' : 'auto',
-          block: 'nearest',
-          inline: 'nearest'
-        });
-      } catch (e) {
-        el.scrollIntoView();
-      }
+  function centerFocusedElement(el, options) {
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    try {
+      el.scrollIntoView({
+        behavior: (options && options.smooth) ? 'smooth' : 'auto',
+        block: 'center',
+        inline: 'nearest'
+      });
+    } catch (e) {
+      el.scrollIntoView();
     }
   }
 
@@ -677,12 +661,7 @@
       setFocus(best, { smooth: true });
     } else {
       // Nothing found in direction: scroll nearest container and retry
-      const didScroll = scrollContainer(direction);
-      if (didScroll) {
-        setTimeout(function () {
-          updateFocusRing();
-        }, 120);
-      }
+      scrollContainer(direction);
     }
   }
 
@@ -713,8 +692,14 @@
 
   function scrollContainer(direction) {
     const container = findScrollableContainer(currentFocusedElement);
-    const scrollAmountY = Math.round(window.innerHeight * 0.6);
-    const scrollAmountX = Math.round(window.innerWidth * 0.6);
+    const containerHeight = container === window
+      ? window.innerHeight
+      : container.clientHeight;
+    const containerWidth = container === window
+      ? window.innerWidth
+      : container.clientWidth;
+    const scrollAmountY = Math.min(360, Math.max(72, Math.round(containerHeight * 0.18)));
+    const scrollAmountX = Math.min(480, Math.max(96, Math.round(containerWidth * 0.18)));
 
     let dx = 0;
     let dy = 0;
@@ -1064,11 +1049,13 @@
    * MAIN REMOTE DISPATCH API (window.__bingeTv.key)
    * ========================================================================= */
   function handleRemoteKey(actionName, repeat, isLongPress) {
-    const now = Date.now();
-    if (now - lastKeyProcessedTime < KEY_THROTTLE_MS && actionName !== 'Select') {
-      return;
+    if (actionName === 'ChannelUp' || actionName === 'ChannelDown') {
+      const now = Date.now();
+      if (repeat > 0 && now - lastChannelScrollTime < CHANNEL_REPEAT_INTERVAL_MS) {
+        return;
+      }
+      lastChannelScrollTime = now;
     }
-    lastKeyProcessedTime = now;
 
     // Check if input element is currently focused and typing
     const active = document.activeElement;
@@ -1238,6 +1225,10 @@
   window.addEventListener('scroll', function () {
     updateFocusRing();
   }, { passive: true });
+
+  document.addEventListener('scroll', function () {
+    updateFocusRing();
+  }, { passive: true, capture: true });
 
   window.addEventListener('resize', function () {
     updateFocusRing();

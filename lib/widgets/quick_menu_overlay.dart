@@ -17,7 +17,6 @@ class QuickMenuOverlay extends StatefulWidget {
     required this.onToggleAdBlock,
     required this.onAllowRedirectOnce,
     this.pendingBlockedRedirect,
-    required this.onOpenRemoteTest,
     required this.onOpenDiagnostics,
     required this.webViewVersion,
   });
@@ -33,7 +32,6 @@ class QuickMenuOverlay extends StatefulWidget {
   final ValueChanged<bool> onToggleAdBlock;
   final VoidCallback onAllowRedirectOnce;
   final String? pendingBlockedRedirect;
-  final VoidCallback onOpenRemoteTest;
   final VoidCallback onOpenDiagnostics;
   final String webViewVersion;
 
@@ -239,12 +237,6 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                   const SizedBox(height: 8),
                   const Divider(color: Colors.white24),
                   const SizedBox(height: 8),
-                  _buildMenuItem(
-                    icon: Icons.settings_remote,
-                    label: 'Remote Test & Diagnostics',
-                    subtitle: 'Verify keycodes and hardware delivery',
-                    onTap: widget.onOpenRemoteTest,
-                  ),
                   _buildMenuItem(
                     icon: Icons.health_and_safety,
                     label: 'Diagnostics',
