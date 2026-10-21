@@ -19,7 +19,7 @@ void main() {
   }
 
   group('Selector Screen Widget Tests', () {
-    testWidgets('renders brand title, site profiles and settings button', (
+    testWidgets('renders brand title, site profiles and Edit links action', (
       tester,
     ) async {
       await tester.pumpWidget(buildTestApp());
@@ -37,7 +37,15 @@ void main() {
     testWidgets('profiles fit compact TV and mobile logical viewports', (
       tester,
     ) async {
-      for (final size in [const Size(640, 360), const Size(390, 844)]) {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (final size in [
+        const Size(960, 540),
+        const Size(1280, 720),
+        const Size(640, 360),
+        const Size(390, 844),
+        const Size(844, 390),
+      ]) {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
         await tester.pumpWidget(buildTestApp());
@@ -50,8 +58,6 @@ void main() {
         }
         expect(tester.takeException(), isNull);
       }
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
     });
 
     testWidgets(
@@ -65,7 +71,7 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
         await tester.pumpAndSettle();
 
-        // Press D-pad Down to move focus to the settings button
+        // Press D-pad Down to move focus to Edit links
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
         await tester.pumpAndSettle();
 

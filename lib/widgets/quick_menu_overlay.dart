@@ -274,7 +274,10 @@ class _QuickMenuOverlayState extends State<QuickMenuOverlay> {
                         const SizedBox(height: 4),
                         const Text(
                           'App Version: 1.0.0 (Fire OS 8 / Android 11 API 30)',
-                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                          style: TextStyle(
+                            color: bingeTextSecondary,
+                            fontSize: 15,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
