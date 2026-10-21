@@ -19,7 +19,7 @@ void main() {
   }
 
   group('Selector Screen Widget Tests', () {
-    testWidgets('renders brand title, site profiles and settings button', (
+    testWidgets('renders only the two site profiles', (
       tester,
     ) async {
       await tester.pumpWidget(buildTestApp());
@@ -28,52 +28,70 @@ void main() {
       expect(find.text('Binge'), findsOneWidget);
       expect(find.text('BingeBang'), findsOneWidget);
       expect(find.text('Rivestream'), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
+      expect(find.byType(TvFocusable), findsNWidgets(2));
+      expect(find.text('Edit links'), findsNothing);
+      expect(find.text('Settings'), findsNothing);
+      expect(find.text('Remote Test'), findsNothing);
       expect(find.text('bingebang.st'), findsNothing);
       expect(find.text('rivestream.ru'), findsNothing);
       expect(find.text('Manage sites'), findsNothing);
     });
 
-    testWidgets(
-      'supports D-pad navigation and moves focus across cards and buttons',
-      (tester) async {
+    testWidgets('profiles fit compact TV and mobile logical viewports', (
+      tester,
+    ) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (final size in [
+        const Size(960, 540),
+        const Size(1280, 720),
+        const Size(640, 360),
+        const Size(390, 844),
+        const Size(844, 390),
+      ]) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
         await tester.pumpWidget(buildTestApp());
         await tester.pumpAndSettle();
 
-        // First card has initial focus
-        // Press D-pad Right to navigate to second card
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pumpAndSettle();
+        for (final label in ['BingeBang', 'Rivestream']) {
+          final rect = tester.getRect(find.text(label));
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(size.width));
+        }
+        expect(tester.takeException(), isNull);
+      }
+    });
 
-        // Press D-pad Down to move focus to the settings button
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-        await tester.pumpAndSettle();
+    testWidgets('one D-pad press moves to one adjacent site', (tester) async {
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
+      final profiles = tester.widgetList<TvFocusable>(find.byType(TvFocusable));
+      final focusNodes = profiles.map((profile) => profile.focusNode!).toList();
 
-        // Press D-pad Up to navigate back to cards
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-        await tester.pumpAndSettle();
+      expect(focusNodes[0].hasFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(focusNodes[0].hasFocus, isFalse);
+      expect(focusNodes[1].hasFocus, isTrue);
 
-        expect(find.byType(SelectorScreen), findsOneWidget);
-      },
-    );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(focusNodes[0].hasFocus, isTrue);
+      expect(find.byType(SelectorScreen), findsOneWidget);
+    });
 
-    testWidgets('OK / Select activates Settings and opens EditSitesScreen', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(1920, 1080);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-
+    testWidgets('Menu opens the editor for the focused site', (tester) async {
       await tester.pumpWidget(buildTestApp());
       await tester.pumpAndSettle();
 
-      // Tap or focus Settings button
-      await tester.tap(find.text('Settings'));
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
       await tester.pumpAndSettle();
 
-      // Verify EditSitesScreen is opened
-      expect(find.byType(EditSitesScreen), findsOneWidget);
-      expect(find.text('Save'), findsOneWidget);
+      expect(find.text('Edit BingeBang'), findsOneWidget);
+      expect(find.text('Website name'), findsOneWidget);
+      expect(find.text('Website URL'), findsOneWidget);
+      expect(find.text('Remote Test'), findsNothing);
     });
 
     testWidgets('tapping BingeBang opens exactly one site route', (

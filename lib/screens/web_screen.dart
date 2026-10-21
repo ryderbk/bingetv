@@ -13,7 +13,6 @@ import '../services/navigation_history.dart';
 import '../theme.dart';
 import '../widgets/quick_menu_overlay.dart';
 import '../widgets/tv_focusable.dart';
-import 'remote_test_screen.dart';
 import 'diagnostics_screen.dart';
 import 'selector_screen.dart';
 
@@ -598,19 +597,6 @@ if (!window.__bingeTv || !window.__bingeTv.initialized) {
                       _isQuickMenuOpen = false;
                     });
                   }
-                },
-                onOpenRemoteTest: () {
-                  setState(() => _isQuickMenuOpen = false);
-                  _keyPipeline.setMode(InputMode.remoteTest);
-                  Navigator.of(context)
-                      .push(
-                        MaterialPageRoute(
-                          builder: (_) => const RemoteTestScreen(),
-                        ),
-                      )
-                      .whenComplete(() {
-                        _keyPipeline.setMode(InputMode.webPage);
-                      });
                 },
                 onOpenDiagnostics: () {
                   setState(() => _isQuickMenuOpen = false);

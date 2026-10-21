@@ -13,7 +13,7 @@ Target: Xiaomi FX Pro 4K 43", Fire OS 8.1.7.4, Android 11/API 30.
 
 - [ ] Selector appears without an indefinite spinner.
 - [ ] D-pad focuses both default cards and OK opens each site.
-- [ ] Edit links saves a custom URL and survives restart.
+- [ ] Menu opens the focused site's editor; edited name and URL survive restart.
 - [ ] Initial redirects follow through to the final domain.
 - [ ] A moved-domain banner offers Yes and No.
 - [ ] Quick Menu works before JavaScript loads.
@@ -22,7 +22,7 @@ Target: Xiaomi FX Pro 4K 43", Fire OS 8.1.7.4, Android 11/API 30.
 
 ## Remote key observations
 
-Press each key on **Quick Menu > Remote Test** and fill in the result.
+Press each listed remote key on the website and fill in the result.
 
 | Key | Expected action | Received | Notes |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ Press each key on **Quick Menu > Remote Test** and fill in the result.
 | Back / Menu / Guide | Navigation | | |
 | Play/Pause | Media | | |
 | Rewind / Fast-forward | Seek | | |
-| Channel +/- / Info / Subtitle | Site action | | |
+| Channel +/- / Info / Subtitle | Scroll / site action | | |
 | Red / Green / Yellow / Blue | Shortcuts | | |
 | 0-9 | Number shortcuts | | |
 
@@ -41,10 +41,11 @@ Press each key on **Quick Menu > Remote Test** and fill in the result.
 - [ ] Pause/resume the app with Home and confirm lifecycle recovery.
 - [ ] Open Diagnostics and verify WebView package, UA, URL, key pipeline and
   blocker counts.
-- [ ] Confirm 100 random D-pad presses never lose the focus ring.
-- [ ] Confirm moving across every editor row never opens the keyboard; OK does.
-- [ ] Return from Remote Test and Diagnostics and confirm the WebView still
-  responds to the remote.
+- [ ] Confirm 100 D-pad presses each move exactly one focus step and the ring
+  stays aligned with the selected control.
+- [ ] Confirm focus stays vertically centered while navigating long pages.
+- [ ] Confirm Channel Up/Down scroll smoothly in the active page container.
+- [ ] Return from Diagnostics and confirm the WebView still responds to the remote.
 - [ ] Compare Colour check swatches in Movie/Filmmaker picture mode.
 - [ ] Re-test INFO, GUIDE and BACK explicitly.
 - [ ] Select **Copy report**, then run:

@@ -62,25 +62,25 @@ and launches Binge.
 | --- | --- |
 | D-pad / OK | Move focus / activate |
 | Back | Close overlay, WebView history, or return to sites |
-| Menu | Open the Quick Menu |
+| Menu | Edit selected site / open Quick Menu |
 | Guide | Return to the site selector |
 | Red | Toggle cursor mode |
 | Blue | Reload the current page |
 | Play/Pause | Toggle HTML5 playback |
 | Rewind / Fast-forward | Seek |
-| Channel +/- | Page/channel navigation |
+| Channel +/- | Scroll the website |
 | Info / Subtitle | Site navigation actions |
 | 0-9 | Number shortcuts |
 
-Home, Voice, Power, volume and shortcut keys are handled by Fire OS and are
-not delivered to the application.
+Home, Voice, Power and volume buttons are handled by Fire OS and are not
+delivered to the application.
 
 ## Links, safe mode and diagnostics
 
-Use **Edit links** on the selector to change site names or URLs. A missing
-scheme is normalized to `https://`. The Quick Menu remains available without
-JavaScript and contains reload, home, safe loading, diagnostics, page width
-and ad-block controls.
+On the selector, focus either site and press the remote **Menu** button to edit
+that site's name and URL. A missing URL scheme is normalized to `https://`. The
+Quick Menu remains available without JavaScript and contains reload, home, safe
+loading, diagnostics, page width and ad-block controls.
 
 The WebView is created immediately with safe defaults. If startup fails, the
 selector falls back to the built-in links. A page that makes no progress for

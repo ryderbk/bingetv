@@ -120,7 +120,7 @@ class _TvTextFieldState extends State<TvTextField> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: focused ? const Color(0xFF17122A) : const Color(0xFF0E0B14),
+          color: focused ? bingeRaised : bingeSurface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: focused ? bingeYellow : bingeDivider,
@@ -139,14 +139,16 @@ class _TvTextFieldState extends State<TvTextField> {
                     Text(
                       widget.label,
                       style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 15,
+                        color: bingeTextSecondary,
+                        fontSize: 16,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
                       widget.controller.text,
-                      style: const TextStyle(color: Colors.white, fontSize: 21),
+                      style: const TextStyle(color: Colors.white, fontSize: 20),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (_error != null)
                       Text(

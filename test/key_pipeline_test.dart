@@ -7,7 +7,6 @@ void main() {
     expect(shouldEnableNativeInterception(InputMode.editor), isFalse);
     expect(shouldEnableNativeInterception(InputMode.webPage), isTrue);
     expect(shouldEnableNativeInterception(InputMode.webOverlay), isFalse);
-    expect(shouldEnableNativeInterception(InputMode.remoteTest), isFalse);
     expect(shouldEnableNativeInterception(InputMode.diagnostics), isFalse);
     expect(shouldEnableNativeInterception(InputMode.editingText), isFalse);
   });
